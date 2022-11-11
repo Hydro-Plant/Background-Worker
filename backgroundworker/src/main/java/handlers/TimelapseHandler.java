@@ -5,11 +5,16 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
@@ -18,17 +23,24 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
 import timelapse.TimeLapseData;
+import timelapse.TimeLapsePos;
 
 public class TimelapseHandler {
+	private final double plant_distance = 1; // in m
+	private final double OtoZ = 1; // in m
 
 	static MemoryPersistence pers;
 	static MqttClient backg_client;
 
 	static ArrayList<TimeLapseData> timelapse_data;
+	static ArrayList<TimeLapsePos> timelapse_pos;
 
 	static Gson gson;
 	static File tl_save = new File("saves/timelapse.save");
-
+	static File tlp_save = new File("saves/timelapse_pos.save");
+	
+	static boolean free = true;
+	
 	public void setupMqtt() {
 		try {
 
@@ -37,49 +49,72 @@ public class TimelapseHandler {
 			backg_client = new MqttClient("tcp://localhost:1883", "backgroundworker", pers);
 			backg_client.connect();
 			System.out.println("Background-Client communication established");
-			backg_client.subscribe(new String[] { "timelapse/add", "timelapse/delete", "timelapse/get" });
+			backg_client.subscribe(new String[] { "timelapse/add", "timelapse/delete", "timelapse/get", "serial/camera/reached", "camera/taken" });
 
 			System.out.println("Background-Client subscriptions completed");
 			backg_client.setCallback(new MqttCallback() {
 				@Override
 				public void messageArrived(String topic, MqttMessage message) throws Exception {
 					switch (topic.toUpperCase()) {
+					case "SERIAL/CAMERA/REACHED":
+							
+						break;
+					case "CAMERA/TAKEN":
+						
+						break;
 					case "TIMELAPSE/ADD":
 						TimeLapseData tld = gson.fromJson(message.toString(), TimeLapseData.class);
-
+						TimeLapsePos tlp = calculateTimeLapseDates(tld.getDateFrom(), tld.getTimeFrom(), tld.getDateTo(), tld.getTimeTo(), tld.pictures, tld.mode);
+						
 						idloop: for (int x = 0; true; x++) {
 							for (int y = 0; y < timelapse_data.size(); y++) {
 								if (x == timelapse_data.get(y).id)
 									continue idloop;
 							}
 							tld.id = x;
+							tlp.id = x;
 							break;
 						}
-
-						System.out.println("New: " + tld.id);
-
+						
 						timelapse_data.add(tld);
 						FileWriter fw = new FileWriter(tl_save.getAbsolutePath());
 						fw.write(gson.toJson(timelapse_data));
 						fw.close();
 						backg_client.publish("timelapse/data", new MqttMessage(gson.toJson(timelapse_data).getBytes()));
+						
+						timelapse_pos.add(tlp);
+						fw = new FileWriter(tlp_save.getAbsolutePath());
+						fw.write(gson.toJson(timelapse_pos));
+						fw.close();
+						
 						break;
 
 					case "TIMELAPSE/DELETE":
-						System.out.println("In");
 						for (int x = 0; x < timelapse_data.size(); x++) {
 							if (timelapse_data.get(x).id == (int) Integer.parseInt(new String(message.getPayload()))) {
-								System.out.println("Delete: " + message.getPayload().toString());
+								System.out.println("Data removed");
 								timelapse_data.remove(x);
 								break;
 							}
 						}
-						System.out.println("Out");
+						
+						for (int x = 0; x < timelapse_pos.size(); x++) {
+							if (timelapse_pos.get(x).id == (int) Integer.parseInt(new String(message.getPayload()))) {
+								System.out.println("Pos removed");
+								timelapse_pos.remove(x);
+								break;
+							}
+						}
 
 						FileWriter fw2 = new FileWriter(tl_save.getAbsolutePath());
 						fw2.write(gson.toJson(timelapse_data));
 						fw2.close();
 						backg_client.publish("timelapse/data", new MqttMessage(gson.toJson(timelapse_data).getBytes()));
+						
+						fw2 = new FileWriter(tlp_save.getAbsolutePath());
+						fw2.write(gson.toJson(timelapse_pos));
+						fw2.close();
+						
 						break;
 
 					case "TIMELAPSE/GET":
@@ -120,6 +155,18 @@ public class TimelapseHandler {
 				e.printStackTrace();
 			}
 		}
+		
+		if (!tlp_save.exists()) {
+			try {
+				tlp_save.createNewFile();
+				FileWriter fw = new FileWriter(tlp_save.getAbsolutePath());
+				fw.write("[\n]");
+				fw.close();
+			} catch (IOException e) {
+				System.out.println("TimeLapsePos Save-File couldn't be built");
+				e.printStackTrace();
+			}
+		}
 
 		// ----------------------------------- Creating Gson
 
@@ -148,10 +195,118 @@ public class TimelapseHandler {
 			e.printStackTrace();
 		}
 		System.out.println("TimeLapseFile read");
-
+		timelapse_data = new ArrayList<TimeLapseData>();
 		timelapse_data = gson.fromJson(timeLapses.toString(), new TypeToken<ArrayList<TimeLapseData>>() {
 		}.getType());
 
 		System.out.println("Save file data extracted");
+		
+		String timeLapsePoses = "";
+		try {
+			FileReader fr = new FileReader(tlp_save.getAbsolutePath());
+			boolean end_reached = false;
+			while (!end_reached) {
+				char x = (char) fr.read();
+				if (x == (char) -1)
+					end_reached = true;
+				else
+					timeLapsePoses += x;
+			}
+			fr.close();
+		} catch (FileNotFoundException e) {
+			System.out.println("TimeLapsePos File not found");
+			e.printStackTrace();
+		} catch (IOException e) {
+			System.out.println("Reading TimeLapsePos File failed");
+			e.printStackTrace();
+		}
+		System.out.println("TimeLapsePosFile read");
+		timelapse_pos = new ArrayList<TimeLapsePos>();
+		timelapse_pos = gson.fromJson(timeLapsePoses.toString(), new TypeToken<ArrayList<TimeLapsePos>>() {
+		}.getType());
+
+		System.out.println("Pos Save file data extracted");
+	}
+
+	public TimeLapsePos calculateTimeLapseDates(LocalDate from_date, LocalTime from_time, LocalDate to_date,
+			LocalTime to_time, long images, int mode) {
+		long epoch_from = from_date.toEpochSecond(from_time, ZoneOffset.of("+1"));
+		long epoch_to = to_date.toEpochSecond(to_time, ZoneOffset.of("+1"));
+
+		double image_gap = (double)(epoch_to - epoch_from) / (images - 1);
+		System.out.println(image_gap);
+
+		ArrayList<LocalDate> dates = new ArrayList<LocalDate>();
+		ArrayList<LocalTime> times = new ArrayList<LocalTime>();
+
+		ArrayList<Double> pos = new ArrayList<Double>();
+		ArrayList<Double> angle = new ArrayList<Double>();
+		for (int x = 0; x < images; x++) {
+			LocalDateTime ldt = LocalDateTime.ofEpochSecond((long) (epoch_from + x * image_gap), 0,
+					ZoneOffset.of("+1"));
+			dates.add(ldt.toLocalDate());
+			times.add(ldt.toLocalTime());
+
+			switch (mode) {
+			case 0:
+				pos.add(0.5);
+				angle.add((double) 0);
+				break;
+			case 1:
+				pos.add((image_gap * x) / (epoch_to - epoch_from));
+				angle.add((double) 0);
+				break;
+			case 2:
+				pos.add((image_gap * x) / (epoch_to - epoch_from));
+				angle.add(Math.atan((0.5 - pos.get(x)) * OtoZ / plant_distance));
+				break;
+			}
+		}
+		
+		TimeLapsePos res = new TimeLapsePos(dates, times, pos, angle, -1);
+		return res;
+	}
+	
+	public void handle() {
+		if(free) {
+			long epoch_now = LocalDate.now().toEpochSecond(LocalTime.now(), ZoneOffset.of("+1"));
+			for(int x = 0; x < timelapse_pos.size(); x++) {
+				TimeLapsePos sel = timelapse_pos.get(x);
+				boolean done = false;
+				long sel_epoch;
+				while(!done) {
+					sel_epoch = LocalDate.parse(sel.dates.get(sel.at_image + 1)).toEpochSecond(LocalTime.parse(sel.times.get(sel.at_image + 1)), ZoneOffset.of("+1"));
+					if(sel_epoch <= epoch_now) {
+						sel.at_image++;
+						System.out.println("Overslept");
+					}else {
+						done = true;
+					}
+				}
+				sel_epoch = LocalDate.parse(sel.dates.get(sel.at_image)).toEpochSecond(LocalTime.parse(sel.times.get(sel.at_image)), ZoneOffset.of("+1")); 
+				if(sel_epoch <= epoch_now) {
+					ArrayList<Integer> info = new ArrayList<Integer>();
+					info.add(sel.id);
+					info.add(sel.at_image);
+					try {
+						backg_client.publish("camera/picture", new MqttMessage(gson.toJson(info).toString().getBytes()));
+					} catch (MqttException e1) {
+						// TODO Auto-generated catch block
+						e1.printStackTrace();
+					}
+					System.out.println("Cheeese");
+					sel.at_image++;
+					FileWriter fw;
+					try {
+						fw = new FileWriter(tlp_save.getAbsolutePath());
+						fw.write(gson.toJson(timelapse_pos));
+						fw.close();
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				}
+			}
+		}
 	}
 }
