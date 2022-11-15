@@ -13,6 +13,7 @@ import handlers.TimelapseHandler;
 public class App {
 	static File save_dir = new File("saves/");
 	static File img_dir = new File("images/");
+	static File vid_dir = new File("videos/");
 	static TimelapseHandler tlh;
 	static SerialHandler sh;
 	static CameraHandler ch;
@@ -27,6 +28,9 @@ public class App {
 		}
 		if(!img_dir.exists()) {
 			img_dir.mkdir();
+		}
+		if(!vid_dir.exists()) {
+			vid_dir.mkdir();
 		}
 		
 		// ----------------------------------- Adding Timelapse Handler
@@ -48,6 +52,7 @@ public class App {
 		while (true) {
 			tlh.handle();
 			sh.handle();
+			ch.handle();
 		}
 	}
 }

@@ -73,7 +73,7 @@ public class SerialHandler {
 
 				@Override
 				public void connectionLost(Throwable cause) {
-					System.out.println("Connection lost");
+					System.out.println("Serial Mqtt-Connection lost");
 					System.out.println(cause.toString());
 				}
 
@@ -106,8 +106,10 @@ public class SerialHandler {
 
 				for (int y = 0; y < 5; y++) {
 					long millis = System.currentTimeMillis();
+					boolean any_answere = false;
 					timer_loop: while (System.currentTimeMillis() < millis + 3000) {
 						if (port.bytesAvailable() >= 2) {
+							any_answere = true;
 							byte[] t = new byte[2];
 							port.readBytes(t, 2);
 							System.out.println("Answere: " + new String(t));
@@ -127,6 +129,7 @@ public class SerialHandler {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
+					if(!any_answere) break;
 				}
 				System.out.println("Wrong port");
 				port.closePort();
@@ -149,6 +152,16 @@ public class SerialHandler {
 					else
 						res += new String(inp);
 				}
+			}
+			
+			try {
+				serial_client.publish("serial/monitor", new MqttMessage(res.getBytes()));
+			} catch (MqttPersistenceException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			} catch (MqttException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
 			}
 
 			if (res.length() >= 5 && res.substring(0, 5).equals("VTEMP")) { // Getting values
