@@ -27,7 +27,9 @@ public class SerialHandler {
 	static MqttClient serial_client;
 
 	static Gson gson;
-
+	
+	static ArrayList<String> port_list;
+	
 	public void setupGson() {
 		gson = new GsonBuilder().setPrettyPrinting().create();
 		System.out.println("Serial-Gson created");
@@ -35,14 +37,14 @@ public class SerialHandler {
 
 	public void setupMqtt() {
 		try {
-
+			port_list = new ArrayList<String>();
+			
 			pers = new MemoryPersistence();
 
 			serial_client = new MqttClient("tcp://localhost:1883", "serial", pers);
 			serial_client.connect();
 			System.out.println("Serial-Client communication established");
 			serial_client.subscribe(new String[] { "option/interval", "serial/camera/set", "serial/camera/reset" });
-
 			System.out.println("Serial-Client subscriptions completed");
 			serial_client.setCallback(new MqttCallback() {
 				@Override
@@ -52,7 +54,7 @@ public class SerialHandler {
 						String value = new String(message.getPayload());
 						int len = value.length();
 						String msg = "VT" + len + value;
-						port.writeBytes(msg.getBytes(), msg.length());
+						port_list.add(msg);
 						break;
 
 					case "SERIAL/CAMERA/SET":
@@ -61,12 +63,12 @@ public class SerialHandler {
 								}.getType());
 						if (cam_pos.size() == 2) {
 							String msg2 = "C" + cam_pos.get(0) + ";" + cam_pos.get(1);
-							port.writeBytes(msg2.getBytes(), msg2.length());
+							port_list.add(msg2);
 						}
 						break;
 
 					case "SERIAL/CAMERA/RESET":
-						port.writeBytes("CR".getBytes(), 2);
+						port_list.add("CR");
 						break;
 					}
 				}
@@ -140,6 +142,11 @@ public class SerialHandler {
 	}
 
 	public void handle() {
+		if(port_list.size() > 0 && port.bytesAwaitingWrite() <= 0) {
+			port.writeBytes(port_list.get(0).getBytes(), port_list.get(0).length());
+			port_list.remove(0);
+		}
+		
 		if (port.bytesAvailable() > 0) {
 			boolean reading = true;
 			String res = "";

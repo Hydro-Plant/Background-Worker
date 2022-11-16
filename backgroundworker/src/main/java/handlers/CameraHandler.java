@@ -193,6 +193,15 @@ public class CameraHandler {
 				} while (packet.isComplete());
 				muxer.close();
 				System.out.println("Muxer closed");
+
+				for (int x = 0; x < len; x++) {
+					File cur_file = new File(new String("images/img_" + id + "_" + x + ".png"));
+					if (cur_file.exists())
+						cur_file.delete();
+				}
+				
+				System.out.println("Images deleted");
+				
 				break;
 			case "CAMERA/DELETE":			// ACHTUNG: DOPPELTES E UM AUSLÖSUNG ZU VERHINDERN
 				ArrayList<Integer> val3 = gson.fromJson(new String(com_order.get(0).getPayload()),
