@@ -49,7 +49,7 @@ public class CameraHandler {
 	}
 
 	public void setupWebcam() {
-		//Webcam.setDriver(new V4l4jDriver());
+		Webcam.setDriver(new V4l4jDriver());
 		webcam = Webcam.getDefault();
 		webcam.open();
 	}

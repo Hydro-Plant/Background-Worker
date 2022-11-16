@@ -25,15 +25,6 @@ public class App {
 	
 	public static void main(String[] args) {
 		System.out.println("Backgroundworker active");
-		
-		Runtime.getRuntime().addShutdownHook(new Thread() {
-
-		    @Override
-		    public void run() {
-		        camera_thread.stop();
-		    }
-
-		});
 
 		// ----------------------------------- Checking save directory
 
