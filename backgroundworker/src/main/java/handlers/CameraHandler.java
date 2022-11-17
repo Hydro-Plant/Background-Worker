@@ -16,7 +16,8 @@ import org.eclipse.paho.client.mqttv3.MqttPersistenceException;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
 import com.github.sarxos.webcam.Webcam;
-import com.github.sarxos.webcam.ds.v4l4j.V4l4jDriver;
+import com.github.sarxos.webcam.ds.fswebcam.FsWebcamDriver;
+import com.github.sarxos.webcam.ds.mjpeg.MjpegCaptureDriver;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -49,9 +50,18 @@ public class CameraHandler {
 	}
 
 	public void setupWebcam() {
-		Webcam.setDriver(new V4l4jDriver());
-		webcam = Webcam.getDefault();
-		webcam.open();
+		try {
+			// Webcam.setDriver(new FsWebcamDriver());
+			//Webcam.setDriver(new FFmpegCliDriver());
+			Webcam.setDriver(new MjpegCaptureDriver().withUri("tcp://127.0.0.1:5000") // this is your local host
+					.withUri("tcp://192.168.1.12:5000")); // this is some remote host
+			webcam = Webcam.getDefault();
+			webcam.open();
+		} catch (Exception e) {
+			System.out.println("No webcam :(");
+			e.printStackTrace();
+		}
+
 	}
 
 	public void setupMqtt() {
@@ -93,15 +103,21 @@ public class CameraHandler {
 		}
 	}
 
+	public void stop() {
+		webcam.close();
+	}
+
 	public void handle() {
 		if (com_order.size() > 0 && topic_order.size() > 0) {
+			System.out.println("Camera input");
 			switch (topic_order.get(0).toUpperCase()) {
 			case "CAMERA/PICTURE":
 				ArrayList<Integer> val = gson.fromJson(new String(com_order.get(0).getPayload()),
 						new TypeToken<ArrayList<Integer>>() {
 						}.getType());
-
+				System.out.println("Webcam making image");
 				BufferedImage img = webcam.getImage();
+				System.out.println("Webcam got image");
 				try {
 					ImageIO.write(img, "png",
 							new File(new String("images/img_" + val.get(0) + "_" + val.get(1) + ".png")));
@@ -199,9 +215,9 @@ public class CameraHandler {
 					if (cur_file.exists())
 						cur_file.delete();
 				}
-				
+
 				System.out.println("Images deleted");
-				
+
 				break;
 			case "CAMERA/DELETE":			// ACHTUNG: DOPPELTES E UM AUSLÖSUNG ZU VERHINDERN
 				ArrayList<Integer> val3 = gson.fromJson(new String(com_order.get(0).getPayload()),

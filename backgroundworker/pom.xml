@@ -17,6 +17,13 @@
 		<maven.compiler.target>1.7</maven.compiler.target>
 	</properties>
 
+	<repositories>
+		<repository>
+			<id>Sonatype OSS Snapshot Repository</id>
+			<url>http://oss.sonatype.org/content/repositories/snapshots</url>
+		</repository>
+	</repositories>
+
 	<dependencies>
 		<dependency>
 			<groupId>junit</groupId>
@@ -50,13 +57,19 @@
 		<dependency>
 			<groupId>com.nativelibs4java</groupId>
 			<artifactId>bridj</artifactId>
-			<version>0.6.2</version>
+			<version>0.7.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.github.sarxos</groupId>
-			<artifactId>webcam-capture-driver-v4l4j</artifactId>
-			<version>0.3.11</version>
+			<artifactId>webcam-capture-driver-fswebcam</artifactId>
+			<version>0.3.12</version>
 		</dependency>
+		<dependency>
+			<groupId>com.github.sarxos</groupId>
+			<artifactId>webcam-capture-driver-mjpeg</artifactId>
+			<version>0.3.13-SNAPSHOT</version>
+		</dependency>
+
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>

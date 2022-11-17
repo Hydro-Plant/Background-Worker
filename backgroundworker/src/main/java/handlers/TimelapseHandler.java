@@ -69,7 +69,6 @@ public class TimelapseHandler {
 							// TODO Auto-generated catch block
 							e1.printStackTrace();
 						}
-						System.out.println("Cheeese");
 						break;
 					case "CAMERA/TAKEN":
 						System.out.println("Picture taken");
