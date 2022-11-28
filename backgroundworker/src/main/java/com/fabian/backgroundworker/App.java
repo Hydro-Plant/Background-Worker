@@ -3,6 +3,7 @@ package com.fabian.backgroundworker;
 import java.io.File;
 
 import handlers.CameraHandler;
+import handlers.PlantHandler;
 import handlers.SerialHandler;
 import handlers.TimelapseHandler;
 
@@ -17,6 +18,7 @@ public class App {
 	static TimelapseHandler tlh;
 	static SerialHandler sh;
 	static CameraHandler ch;
+	static PlantHandler ph;
 
 	static Thread camera_thread;
 	static Thread serial_thread;
@@ -62,18 +64,22 @@ public class App {
 		sh.setupMqtt();
 		sh.setupGson();
 
-		ch = new CameraHandler();
-		ch.setupGson();
-		ch.setupMqtt();
-		ch.setupWebcam();
+		//ch = new CameraHandler();
+		//ch.setupGson();
+		//ch.setupMqtt();
+		//ch.setupWebcam();
+		
+		ph = new PlantHandler();
+		ph.setupGson();
+		ph.setupMqtt();
 
 		// ----------------------------------- Making threads
 
 		camera_thread = new Thread(new Runnable() {
 			@Override
 			public void run() {
-				while (true)
-					ch.handle();
+				//while (true)
+					//ch.handle();
 			}
 		});
 		camera_thread.start();
@@ -99,7 +105,6 @@ public class App {
 		plant_thread = new Thread(new Runnable() {
 			@Override
 			public void run() {
-
 			}
 		});
 		plant_thread.start();
