@@ -1,8 +1,13 @@
 package com.fabian.backgroundworker;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import handlers.CameraHandler;
+import handlers.OptionHandler;
 import handlers.PlantHandler;
 import handlers.SerialHandler;
 import handlers.TimelapseHandler;
@@ -12,6 +17,8 @@ import handlers.TimelapseHandler;
  *
  */
 public class App {
+	static int handle_interval = 10;
+	
 	static File save_dir = new File("saves/");
 	static File img_dir = new File("images/");
 	static File vid_dir = new File("videos/");
@@ -19,24 +26,21 @@ public class App {
 	static SerialHandler sh;
 	static CameraHandler ch;
 	static PlantHandler ph;
+	static OptionHandler oh;
 
-	static Thread camera_thread;
-	static Thread serial_thread;
-	static Thread timelapse_thread;
-	static Thread plant_thread;
+	static ScheduledExecutorService camera_thread;
+	static ScheduledExecutorService serial_thread;
+	static ScheduledExecutorService timelapse_thread;
+	static ScheduledExecutorService plant_thread;
+	static ScheduledExecutorService option_thread;
 
 	public static void main(String[] args) {
 		System.out.println("Backgroundworker active");
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
-
 			@Override
 			public void run() {
 				ch.stop();
-				camera_thread.stop();
-				serial_thread.stop();
-				timelapse_thread.stop();
-				plant_thread.stop();
 			}
 
 		});
@@ -55,6 +59,16 @@ public class App {
 
 		// ----------------------------------- Adding Handlers
 
+		oh = new OptionHandler();
+		oh.setupGson();
+		try {
+			oh.setupSave();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		oh.setupMqtt();
+
 		tlh = new TimelapseHandler();
 		tlh.setupMqtt();
 		tlh.loadSave();
@@ -64,52 +78,59 @@ public class App {
 		sh.setupMqtt();
 		sh.setupGson();
 
-		//ch = new CameraHandler();
-		//ch.setupGson();
-		//ch.setupMqtt();
-		//ch.setupWebcam();
-		
+		// ch = new CameraHandler();
+		// ch.setupGson();
+		// ch.setupMqtt();
+		// ch.setupWebcam();
+
 		ph = new PlantHandler();
 		ph.setupGson();
 		ph.setupMqtt();
+		ph.requestOptions();
 
 		// ----------------------------------- Making threads
 
-		camera_thread = new Thread(new Runnable() {
-			@Override
-			public void run() {
-				//while (true)
-					//ch.handle();
-			}
-		});
-		camera_thread.start();
-
-		serial_thread = new Thread(new Runnable() {
-			@Override
-			public void run() {
-				while (true)
-					sh.handle();
-			}
-		});
-		serial_thread.start();
-
-		timelapse_thread = new Thread(new Runnable() {
-			@Override
-			public void run() {
-				while (true)
-					tlh.handle();
-			}
-		});
-		timelapse_thread.start();
-
-		plant_thread = new Thread(new Runnable() {
-			@Override
-			public void run() {
-			}
-		});
-		plant_thread.start();
-
+		option_thread = Executors.newScheduledThreadPool(1);
+		option_thread.scheduleWithFixedDelay(new Runnable() {
+			  public void run() {
+			    oh.handle();
+			  }
+			}, 0, handle_interval, TimeUnit.MILLISECONDS);
+		
+		camera_thread = Executors.newScheduledThreadPool(1);
+		camera_thread.scheduleWithFixedDelay(new Runnable() {
+			  public void run() {
+			    // ch.handle();
+			  }
+			}, 0, handle_interval, TimeUnit.MILLISECONDS);
+		
+		serial_thread = Executors.newScheduledThreadPool(1);
+		serial_thread.scheduleWithFixedDelay(new Runnable() {
+			  public void run() {
+			    sh.handle();
+			  }
+			}, 0, handle_interval, TimeUnit.MILLISECONDS);
+		
+		timelapse_thread = Executors.newScheduledThreadPool(1);
+		timelapse_thread.scheduleWithFixedDelay(new Runnable() {
+			  public void run() {
+			    tlh.handle();
+			  }
+			}, 0, handle_interval, TimeUnit.MILLISECONDS);
+		
+		/**
+		plant_thread = Executors.newScheduledThreadPool(1);
+		plant_thread.scheduleWithFixedDelay(new Runnable() {
+			  public void run() {
+			    
+			  }
+			}, 0, handle_interval, TimeUnit.MILLISECONDS);
+		**/
+		
+		
+		//System.out.println("HANDLING");
 		while (true) {
+			oh.handle();
 
 		}
 	}

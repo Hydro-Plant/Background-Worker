@@ -88,7 +88,22 @@ public class PlantHandler {
 		}
 	}
 
+	public void requestOptions() {
+		try {
+			plant_client.publish("option/get", new MqttMessage("maxLevel".getBytes()));
+			plant_client.publish("option/get", new MqttMessage("temperature".getBytes()));
+		} catch (MqttException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
 	private void update() {
+		// System.out.println("Min: " + temp_min);
+		// System.out.println("Optimal: " + temp_opt);
+		// System.out.println("Tol: " + temp_tol);
+		// System.out.println("Max: " + temp_max);
+
 		// ---------------------- Checking temperature
 		if ((temp_value > temp_max || temp_value < temp_min) && level_value >= 3) {
 			try {
