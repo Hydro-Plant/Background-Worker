@@ -153,7 +153,7 @@ public class SerialHandler {
 
 	public void handle() {
 		if (port != null) {
-			System.out.println(port.bytesAwaitingWrite() + " | " + port_list.size());
+			//System.out.println(port.bytesAwaitingWrite() + " | " + port_list.size());
 			if (port_list.size() > 0 && port.bytesAwaitingWrite() <= 0) {
 				System.out.println("Writing: " + port_list.get(0) + " | " + port_list.get(0).length());
 				port.writeBytes(port_list.get(0).getBytes(), port_list.get(0).length());

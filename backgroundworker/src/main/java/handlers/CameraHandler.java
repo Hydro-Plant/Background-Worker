@@ -57,7 +57,7 @@ public class CameraHandler {
 	}
 
 	public void setupWebcam() throws org.bytedeco.javacv.FrameGrabber.Exception {
-		grabber = new OpenCVFrameGrabber(0);
+		grabber = new OpenCVFrameGrabber("/dev/video0");
 		grabber.start();
 		/**
 		try {
