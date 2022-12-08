@@ -29,12 +29,12 @@ public class OptionHandler {
 	static Gson gson;
 
 	static boolean save_file = false;
-	static ArrayList<String> requests;
+	static ArrayList<String> requests = new ArrayList<String>();
 	static ArrayList<Option> options;
 
 	public void setupGson() {
 		gson = new GsonBuilder().setPrettyPrinting().create();
-		System.out.println("Serial-Gson created");
+		System.out.println("Option-Gson created");
 	}
 
 	public void setupSave() throws IOException {
@@ -74,11 +74,10 @@ public class OptionHandler {
 		options = gson.fromJson(option_string, new TypeToken<ArrayList<Option>>() {
 		}.getType());
 	}
+	
 
 	public void setupMqtt() {
 		try {
-			requests = new ArrayList<String>();
-
 			pers = new MemoryPersistence();
 
 			option_client = new MqttClient("tcp://localhost:1883", "option", pers);
@@ -105,15 +104,16 @@ public class OptionHandler {
 								}
 							}
 							if(!option_found) {
-								System.out.println("Adding option");
 								options.add(data);
 							}
+							requests.add(data.getName());
 							save_file = true;
 						}
 						break;
 					}
 				}
 
+				
 				@Override
 				public void connectionLost(Throwable cause) {
 					System.out.println("Option Mqtt-Connection lost");
@@ -146,7 +146,7 @@ public class OptionHandler {
 					e.printStackTrace();
 				}
 			}
-			requests.remove(0);
+			if(requests.size() > 0) requests.remove(0);
 		}
 		if(save_file) {
 			save_file = false;
@@ -155,7 +155,6 @@ public class OptionHandler {
 				fw.write(gson.toJson(options));
 				fw.close();
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}

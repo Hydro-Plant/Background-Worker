@@ -47,23 +47,24 @@ public class SerialHandler {
 					switch (topic.toUpperCase()) {
 					case "OPTION/INTERVAL":
 						String value = new String(message.getPayload());
-						int len = value.length();
-						String msg = "VT" + len + value;
+						String msg = "OINTV" + value + "\n";
 						port_list.add(msg);
 						break;
-
 					case "SERIAL/CAMERA/SET":
 						ArrayList<Double> cam_pos = gson.fromJson(new String(message.getPayload()),
 								new TypeToken<ArrayList<Double>>() {
 								}.getType());
 						if (cam_pos.size() == 2) {
-							String msg2 = "C" + cam_pos.get(0) + ";" + cam_pos.get(1);
+							String msg2 = "C" + cam_pos.get(0) + ";" + cam_pos.get(1) + "\n";
+							System.out.println("Port Size: " + port_list.size());
 							port_list.add(msg2);
+							System.out.println("I'm sending the camera somewhere: "+ msg2);
+							System.out.println("Port Size: " + port_list.size());
 						}
 						break;
 
 					case "SERIAL/CAMERA/RESET":
-						port_list.add("CR");
+						port_list.add("CR\n");
 						break;
 					}
 				}
@@ -115,6 +116,11 @@ public class SerialHandler {
 								port = short_port;
 								break port_loop;
 							}
+							//try {
+								//Thread.sleep(100);
+							//} catch (InterruptedException e) {
+							//	e.printStackTrace();
+							//}
 							byte[] mt = new byte[1];
 							while (short_port.bytesAvailable() > 0)
 								short_port.readBytes(mt, 1);
@@ -136,10 +142,20 @@ public class SerialHandler {
 			}
 		}
 	}
+	
+	public void requestOptions() {
+		try {
+			serial_client.publish("option/get", new MqttMessage("interval".getBytes()));
+		} catch (MqttException e) {
+			e.printStackTrace();
+		}
+	}
 
 	public void handle() {
 		if (port != null) {
+			System.out.println(port.bytesAwaitingWrite() + " | " + port_list.size());
 			if (port_list.size() > 0 && port.bytesAwaitingWrite() <= 0) {
+				System.out.println("Writing: " + port_list.get(0) + " | " + port_list.get(0).length());
 				port.writeBytes(port_list.get(0).getBytes(), port_list.get(0).length());
 				port_list.remove(0);
 			}
@@ -180,12 +196,12 @@ public class SerialHandler {
 					} catch (MqttException e) {
 						e.printStackTrace();
 					}
-				} else if (res.length() >= 5 && res.substring(0, 5).equals("VLGST")) {
+				} else if (res.length() >= 5 && res.substring(0, 5).equals("SLIGT")) {
 					try {
 						if (res.substring(5, res.length()).equals("1")) {
-							serial_client.publish("value/lightStatus", new MqttMessage("True".getBytes()));
+							serial_client.publish("status/set", new MqttMessage("{\"name\":\"light\",\"value\":\"True\"}".getBytes()));
 						} else {
-							serial_client.publish("value/lightStatus", new MqttMessage("False".getBytes()));
+							serial_client.publish("status/set", new MqttMessage("{\"name\":\"light\",\"value\":\"False\"}".getBytes()));
 						}
 					} catch (MqttException e) {
 						e.printStackTrace();

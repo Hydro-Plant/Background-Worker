@@ -6,10 +6,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.bytedeco.javacv.FrameGrabber.Exception;
+
 import handlers.CameraHandler;
 import handlers.OptionHandler;
 import handlers.PlantHandler;
 import handlers.SerialHandler;
+import handlers.StatusHandler;
 import handlers.TimelapseHandler;
 
 /**
@@ -27,12 +30,14 @@ public class App {
 	static CameraHandler ch;
 	static PlantHandler ph;
 	static OptionHandler oh;
+	static StatusHandler sth;
 
 	static ScheduledExecutorService camera_thread;
 	static ScheduledExecutorService serial_thread;
 	static ScheduledExecutorService timelapse_thread;
 	static ScheduledExecutorService plant_thread;
 	static ScheduledExecutorService option_thread;
+	static ScheduledExecutorService status_thread;
 
 	public static void main(String[] args) {
 		System.out.println("Backgroundworker active");
@@ -40,7 +45,7 @@ public class App {
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			@Override
 			public void run() {
-				ch.stop();
+				//ch.stop();
 			}
 
 		});
@@ -68,6 +73,10 @@ public class App {
 			e.printStackTrace();
 		}
 		oh.setupMqtt();
+		
+		sth = new StatusHandler();
+		sth.setupGson();
+		sth.setupMqtt();
 
 		tlh = new TimelapseHandler();
 		tlh.setupMqtt();
@@ -77,11 +86,17 @@ public class App {
 		sh.setupConnection();
 		sh.setupMqtt();
 		sh.setupGson();
+		sh.requestOptions();
 
-		// ch = new CameraHandler();
-		// ch.setupGson();
-		// ch.setupMqtt();
-		// ch.setupWebcam();
+		ch = new CameraHandler();
+		ch.setupGson();
+		ch.setupMqtt();
+		try {
+			ch.setupWebcam();
+		} catch (Exception e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
 
 		ph = new PlantHandler();
 		ph.setupGson();
@@ -97,10 +112,17 @@ public class App {
 			  }
 			}, 0, handle_interval, TimeUnit.MILLISECONDS);
 		
+		status_thread = Executors.newScheduledThreadPool(1);
+		status_thread.scheduleWithFixedDelay(new Runnable() {
+			  public void run() {
+			    sth.handle();
+			  }
+			}, 0, handle_interval, TimeUnit.MILLISECONDS);
+		
 		camera_thread = Executors.newScheduledThreadPool(1);
 		camera_thread.scheduleWithFixedDelay(new Runnable() {
 			  public void run() {
-			    // ch.handle();
+			    ch.handle();
 			  }
 			}, 0, handle_interval, TimeUnit.MILLISECONDS);
 		
@@ -130,7 +152,11 @@ public class App {
 		
 		//System.out.println("HANDLING");
 		while (true) {
-			oh.handle();
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
 
 		}
 	}

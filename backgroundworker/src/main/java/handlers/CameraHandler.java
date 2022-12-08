@@ -7,6 +7,12 @@ import java.util.ArrayList;
 
 import javax.imageio.ImageIO;
 
+import org.bytedeco.javacv.Frame;
+import org.bytedeco.javacv.FrameGrabber;
+import org.bytedeco.javacv.OpenCVFrameConverter;
+import org.bytedeco.javacv.OpenCVFrameGrabber;
+import org.bytedeco.opencv.global.opencv_imgcodecs;
+import org.bytedeco.opencv.opencv_core.IplImage;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
@@ -38,6 +44,7 @@ public class CameraHandler {
 	static MqttClient camera_client;
 
 	Webcam webcam;
+	FrameGrabber grabber;
 
 	static Gson gson;
 
@@ -49,18 +56,22 @@ public class CameraHandler {
 		System.out.println("Serial-Gson created");
 	}
 
-	public void setupWebcam() {
+	public void setupWebcam() throws org.bytedeco.javacv.FrameGrabber.Exception {
+		grabber = new OpenCVFrameGrabber(0);
+		grabber.start();
+		/**
 		try {
-			// Webcam.setDriver(new FsWebcamDriver());
+			//Webcam.setDriver(new FsWebcamDriver());
 			//Webcam.setDriver(new FFmpegCliDriver());
-			Webcam.setDriver(new MjpegCaptureDriver().withUri("tcp://127.0.0.1:5000") // this is your local host
-					.withUri("tcp://192.168.1.12:5000")); // this is some remote host
+			//Webcam.setDriver(new MjpegCaptureDriver().withUri("tcp://127.0.0.1:5000") // this is your local host
+			//		.withUri("tcp://192.168.1.12:5000")); // this is some remote host
 			webcam = Webcam.getDefault();
 			webcam.open();
 		} catch (Exception e) {
 			System.out.println("No webcam :(");
 			e.printStackTrace();
 		}
+		**/
 
 	}
 
@@ -116,8 +127,29 @@ public class CameraHandler {
 						new TypeToken<ArrayList<Integer>>() {
 						}.getType());
 				System.out.println("Webcam making image");
-				BufferedImage img = webcam.getImage();
+				//BufferedImage img = webcam.getImage();
+				
+				Frame frame = null;
+				try {
+					frame = grabber.grabFrame();
+				} catch (org.bytedeco.javacv.FrameGrabber.Exception e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+				
+				OpenCVFrameConverter.ToIplImage converterer = new OpenCVFrameConverter.ToIplImage();
+				IplImage img = converterer.convert(frame);
+				opencv_imgcodecs.cvSaveImage("images/img_" + val.get(0) + "_" + val.get(1) + ".png", img);
+				try {
+					camera_client.publish("camera/taken", new MqttMessage());
+				} catch (MqttException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+				
+				
 				System.out.println("Webcam got image");
+				/**
 				try {
 					ImageIO.write(img, "png",
 							new File(new String("images/img_" + val.get(0) + "_" + val.get(1) + ".png")));
@@ -132,8 +164,15 @@ public class CameraHandler {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
+				**/
 				break;
 			case "CAMERA/VIDEO":
+				try {
+					Thread.sleep(10);
+				} catch (InterruptedException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
 				ArrayList<Double> val2 = gson.fromJson(new String(com_order.get(0).getPayload()),
 						new TypeToken<ArrayList<Double>>() {
 						}.getType());

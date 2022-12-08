@@ -62,6 +62,7 @@ public class TimelapseHandler {
 					switch (topic.toUpperCase()) {
 					case "SERIAL/CAMERA/REACHED":
 						System.out.println("Camera reached pos");
+						System.out.println("I want to take a picture");
 						try {
 							backg_client.publish("camera/picture",
 									new MqttMessage(gson.toJson(info).toString().getBytes()));
@@ -345,6 +346,7 @@ public class TimelapseHandler {
 						pos.add(sel.angle.get(sel.at_image));
 
 						try {
+							System.out.println("I want to send the camera somewhere");
 							backg_client.publish("serial/camera/set",
 									new MqttMessage(gson.toJson(pos).toString().getBytes()));
 						} catch (MqttException e1) {
