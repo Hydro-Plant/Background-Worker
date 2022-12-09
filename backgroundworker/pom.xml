@@ -55,6 +55,13 @@
 
 		<!-- Camera -->
 		<dependency>
+			<groupId>org.openpnp</groupId>
+			<artifactId>opencv</artifactId>
+			<version>3.2.0-0</version>
+		</dependency>
+
+
+		<dependency>
 			<groupId>org.bytedeco</groupId>
 			<artifactId>javacv-platform</artifactId>
 			<version>1.5.5</version>
