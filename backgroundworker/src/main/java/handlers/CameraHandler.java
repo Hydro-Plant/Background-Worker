@@ -62,10 +62,14 @@ public class CameraHandler {
 	}
 
 	public void setupWebcam() throws org.bytedeco.javacv.FrameGrabber.Exception {
+<<<<<<< HEAD
 		startCamera();
 		
 		/**
 		grabber = new OpenCVFrameGrabber(0);
+=======
+		grabber = new OpenCVFrameGrabber("/dev/video0");
+>>>>>>> refs/remotes/origin/main
 		grabber.start();
 		**/
 		
