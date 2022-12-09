@@ -20,7 +20,11 @@ public class PlantHandler {
 	double temp_value, light_value, ph_value, ec_value, flow_value, level_value;
 
 	double temp_min, temp_opt, temp_tol, temp_max;
+	double light_min, light_max;
+	double ph_min, ph_opt, ph_tol, ph_max;
+	double ec_min, ec_opt, ec_tol, ec_max;
 	double max_level;
+	double normal_flow;
 
 	static Gson gson;
 
@@ -53,10 +57,37 @@ public class PlantHandler {
 						temp_tol = temp_options.get(2);
 						temp_max = temp_options.get(3);
 						break;
+					case "OPTION/LIGHT":
+						ArrayList<Double> light_options = gson.fromJson(new String(message.getPayload()),
+								new TypeToken<ArrayList<Double>>() {
+								}.getType());
+						light_min = light_options.get(0);
+						light_max = light_options.get(1);
+						break;
+					case "OPTION/PH":
+						ArrayList<Double> ph_options = gson.fromJson(new String(message.getPayload()),
+								new TypeToken<ArrayList<Double>>() {
+								}.getType());
+						ph_min = ph_options.get(0);
+						ph_opt = ph_options.get(1);
+						ph_tol = ph_options.get(2);
+						ph_max = ph_options.get(3);
+						break;
+					case "OPTION/EC":
+						ArrayList<Double> ec_options = gson.fromJson(new String(message.getPayload()),
+								new TypeToken<ArrayList<Double>>() {
+								}.getType());
+						ec_min = ec_options.get(0);
+						ec_opt = ec_options.get(1);
+						ec_tol = ec_options.get(2);
+						ec_max = ec_options.get(3);
+						break;
 					case "OPTION/MAXLEVEL":
 						max_level = Double.parseDouble(new String(message.getPayload()));
 						break;
-
+					case "OPTION/FLOW":
+						max_level = Double.parseDouble(new String(message.getPayload()));
+						break;
 					case "VALUE/TEMPERATURE":
 						temp_value = Double.parseDouble(new String(message.getPayload()));
 						break;
@@ -97,7 +128,7 @@ public class PlantHandler {
 			e.printStackTrace();
 		}
 	}
-
+		
 	private void update() {
 		// System.out.println("Min: " + temp_min);
 		// System.out.println("Optimal: " + temp_opt);
@@ -188,5 +219,7 @@ public class PlantHandler {
 				e.printStackTrace();
 			}
 		}
+		
+		// Checking 
 	}
 }

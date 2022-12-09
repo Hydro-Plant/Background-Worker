@@ -62,7 +62,6 @@ public class CameraHandler {
 	}
 
 	public void setupWebcam() throws org.bytedeco.javacv.FrameGrabber.Exception {
-<<<<<<< HEAD
 		startCamera();
 		
 		/**
@@ -146,6 +145,13 @@ public class CameraHandler {
 				Mat frame = takePicture();
 				
 				Imgcodecs.imwrite(("images/img_" + val.get(0) + "_" + val.get(1) + ".png"), frame);
+				
+				try {
+					camera_client.publish("camera/taken", new MqttMessage());
+				} catch (MqttException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
 				
 				/**
 				Frame frame = null;
