@@ -19,6 +19,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
 import option.Option;
+import std.std;
 
 public class OptionHandler {
 	File saves = new File("saves/options.save");
@@ -34,7 +35,7 @@ public class OptionHandler {
 
 	public void setupGson() {
 		gson = new GsonBuilder().setPrettyPrinting().create();
-		System.out.println("Option-Gson created");
+		std.INFO(this, "Gson created");
 	}
 
 	public void setupSave() throws IOException {
@@ -45,7 +46,7 @@ public class OptionHandler {
 				fw.write("[\n]");
 				fw.close();
 			} catch (IOException e) {
-				System.out.println("Option Save-File couldn't be built");
+				std.INFO(this, "Option Save-File couldn't be built");
 				e.printStackTrace();
 			}
 		}
@@ -63,13 +64,13 @@ public class OptionHandler {
 			}
 			fr.close();
 		} catch (FileNotFoundException e) {
-			System.out.println("Option File not found");
+			std.INFO(this, "Option File not found");
 			e.printStackTrace();
 		} catch (IOException e) {
-			System.out.println("Option File failed");
+			std.INFO(this, "Option File failed");
 			e.printStackTrace();
 		}
-		System.out.println("Options-File read");
+		std.INFO(this, "Options-File read");
 		options = new ArrayList<Option>();
 		options = gson.fromJson(option_string, new TypeToken<ArrayList<Option>>() {
 		}.getType());
@@ -82,9 +83,9 @@ public class OptionHandler {
 
 			option_client = new MqttClient("tcp://localhost:1883", "option", pers);
 			option_client.connect();
-			System.out.println("Option-Client communication established");
+			std.INFO(this, "Mqtt-communication established");
 			option_client.subscribe(new String[] { "option/get", "option/set" });
-			System.out.println("Option-Client subscriptions completed");
+			std.INFO(this, "Subscriptions added");
 			option_client.setCallback(new MqttCallback() {
 				@Override
 				public void messageArrived(String topic, MqttMessage message) throws Exception {
@@ -116,8 +117,8 @@ public class OptionHandler {
 				
 				@Override
 				public void connectionLost(Throwable cause) {
-					System.out.println("Option Mqtt-Connection lost");
-					System.out.println(cause.toString());
+					std.INFO(this, "Mqtt-connection lost");
+					std.INFO(this, cause.toString());
 				}
 
 				@Override

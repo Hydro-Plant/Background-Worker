@@ -13,24 +13,27 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
+import std.std;
+
 public class PlantHandler {
 	static MemoryPersistence pers;
 	static MqttClient plant_client;
 
-	double temp_value, light_value, ph_value, ec_value, flow_value, level_value;
+	double temp_value, light_value, ph_value, ec_value, tds_value, flow_value, level_value;
 
 	double temp_min, temp_opt, temp_tol, temp_max;
 	double light_min, light_max;
 	double ph_min, ph_opt, ph_tol, ph_max;
 	double ec_min, ec_opt, ec_tol, ec_max;
-	double max_level;
+	double tds_min, tds_opt, tds_tol, tds_max;
+	double max_level, min_measuring;
 	double normal_flow;
 
 	static Gson gson;
 
 	public void setupGson() {
 		gson = new GsonBuilder().setPrettyPrinting().create();
-		System.out.println("Plant-Gson created");
+		std.INFO(this, "Gson created");
 	}
 
 	public void setupMqtt() {
@@ -39,11 +42,10 @@ public class PlantHandler {
 
 			plant_client = new MqttClient("tcp://localhost:1883", "plant", pers);
 			plant_client.connect();
-			System.out.println("Plant-Client communication established");
+			std.INFO(this, "Mqtt-communication established");
 			plant_client.subscribe(new String[] { "option/temperature", "option/maxLevel", "value/temperature",
-					"value/light", "value/ph", "value/ec", "value/flow", "value/level" });
-
-			System.out.println("Plant-Client subscriptions completed");
+					"value/light", "value/ph", "value/ec", "value/tds", "value/flow", "value/level" });
+			std.INFO(this, "Subscriptions added");
 			plant_client.setCallback(new MqttCallback() {
 				@Override
 				public void messageArrived(String topic, MqttMessage message) throws Exception {
@@ -82,7 +84,7 @@ public class PlantHandler {
 						ec_tol = ec_options.get(2);
 						ec_max = ec_options.get(3);
 						break;
-					case "OPTION/MAXLEVEL":
+					case "OPTION/LEVEL":
 						max_level = Double.parseDouble(new String(message.getPayload()));
 						break;
 					case "OPTION/FLOW":
@@ -103,8 +105,8 @@ public class PlantHandler {
 
 				@Override
 				public void connectionLost(Throwable cause) {
-					System.out.println("Plant Mqtt-Connection lost");
-					System.out.println(cause.toString());
+					std.INFO(this, "Mqtt-connection lost");
+					std.INFO(this, cause.toString());
 				}
 
 				@Override
@@ -130,13 +132,8 @@ public class PlantHandler {
 	}
 		
 	private void update() {
-		// System.out.println("Min: " + temp_min);
-		// System.out.println("Optimal: " + temp_opt);
-		// System.out.println("Tol: " + temp_tol);
-		// System.out.println("Max: " + temp_max);
-
 		// ---------------------- Checking temperature
-		if ((temp_value > temp_max || temp_value < temp_min) && level_value >= 3) {
+		if ((temp_value > temp_max || temp_value < temp_min) && level_value >= min_measuring) {
 			try {
 				plant_client.publish("warning/temperature", new MqttMessage("true".getBytes()));
 			} catch (MqttException e) {

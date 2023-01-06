@@ -13,6 +13,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import status.Status;
+import std.std;
 
 public class StatusHandler {
 	static MemoryPersistence pers;
@@ -26,7 +27,7 @@ public class StatusHandler {
 
 	public void setupGson() {
 		gson = new GsonBuilder().setPrettyPrinting().create();
-		System.out.println("Serial-Gson created");
+		std.INFO(this, "Gson created");
 	}
 
 	public void setupMqtt() {
@@ -35,9 +36,9 @@ public class StatusHandler {
 
 			status_client = new MqttClient("tcp://localhost:1883", "status", pers);
 			status_client.connect();
-			System.out.println("Status-Client communication established");
+			std.INFO(this, "Mqtt-communication established");
 			status_client.subscribe(new String[] { "status/get", "status/set" });
-			System.out.println("Status-Client subscriptions completed");
+			std.INFO(this, "Subscriptions added");
 			status_client.setCallback(new MqttCallback() {
 				@Override
 				public void messageArrived(String topic, MqttMessage message) throws Exception {
@@ -68,8 +69,8 @@ public class StatusHandler {
 
 				@Override
 				public void connectionLost(Throwable cause) {
-					System.out.println("Status Mqtt-Connection lost");
-					System.out.println(cause.toString());
+					std.INFO(this, "Mqtt-connection lost");
+					std.INFO(this, cause.toString());
 				}
 
 				@Override

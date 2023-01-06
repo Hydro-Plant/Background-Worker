@@ -15,6 +15,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
+import std.std;
+
 public class SerialHandler {
 	SerialPort port = null;
 
@@ -27,7 +29,7 @@ public class SerialHandler {
 
 	public void setupGson() {
 		gson = new GsonBuilder().setPrettyPrinting().create();
-		System.out.println("Serial-Gson created");
+		std.INFO(this, "Gson created");
 	}
 
 	public void setupMqtt() {
@@ -38,9 +40,9 @@ public class SerialHandler {
 
 			serial_client = new MqttClient("tcp://localhost:1883", "serial", pers);
 			serial_client.connect();
-			System.out.println("Serial-Client communication established");
+			std.INFO(this, "Mqtt-communication established");
 			serial_client.subscribe(new String[] { "option/interval", "serial/camera/set", "serial/camera/reset" });
-			System.out.println("Serial-Client subscriptions completed");
+			std.INFO(this, "Subscriptions added");
 			serial_client.setCallback(new MqttCallback() {
 				@Override
 				public void messageArrived(String topic, MqttMessage message) throws Exception {
@@ -56,10 +58,7 @@ public class SerialHandler {
 								}.getType());
 						if (cam_pos.size() == 2) {
 							String msg2 = "C" + cam_pos.get(0) + ";" + cam_pos.get(1) + "\n";
-							System.out.println("Port Size: " + port_list.size());
 							port_list.add(msg2);
-							System.out.println("I'm sending the camera somewhere: "+ msg2);
-							System.out.println("Port Size: " + port_list.size());
 						}
 						break;
 
@@ -71,8 +70,8 @@ public class SerialHandler {
 
 				@Override
 				public void connectionLost(Throwable cause) {
-					System.out.println("Serial Mqtt-Connection lost");
-					System.out.println(cause.toString());
+					std.INFO(this, "Mqtt-connection lost");
+					std.INFO(this, cause.toString());
 				}
 
 				@Override
@@ -99,10 +98,16 @@ public class SerialHandler {
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
-				System.out.println("Testing port " + short_port.getSystemPortName());
-				short_port.writeBytes("?\n".getBytes(), 2);
-
+				std.INFO(this, "Testing port " + short_port.getSystemPortName());
+				
 				for (int y = 0; y < 5; y++) {
+					short_port.writeBytes("?".getBytes(), 2);
+					try {
+						Thread.sleep(500);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+					
 					long millis = System.currentTimeMillis();
 					boolean any_answere = false;
 					timer_loop: while (System.currentTimeMillis() < millis + 3000) {
@@ -110,9 +115,9 @@ public class SerialHandler {
 							any_answere = true;
 							byte[] t = new byte[2];
 							short_port.readBytes(t, 2);
-							System.out.println("Answere: " + new String(t));
+							std.INFO(this, "Answere: " + new String(t));
 							if (new String(t).equals("OK")) {
-								System.out.println("Communication port found");
+								std.INFO(this, "Communication port found");
 								port = short_port;
 								break port_loop;
 							}
@@ -135,10 +140,10 @@ public class SerialHandler {
 					if (!any_answere)
 						break;
 				}
-				System.out.println("Wrong port");
+				std.INFO(this, "Wrong port");
 				short_port.closePort();
 			} else {
-				System.out.println("Could not open port " + short_port.getSystemPortName());
+				std.INFO(this, "Could not open port " + short_port.getSystemPortName());
 			}
 		}
 	}
@@ -153,9 +158,7 @@ public class SerialHandler {
 
 	public void handle() {
 		if (port != null) {
-			//System.out.println(port.bytesAwaitingWrite() + " | " + port_list.size());
 			if (port_list.size() > 0 && port.bytesAwaitingWrite() <= 0) {
-				System.out.println("Writing: " + port_list.get(0) + " | " + port_list.get(0).length());
 				port.writeBytes(port_list.get(0).getBytes(), port_list.get(0).length());
 				port_list.remove(0);
 			}
@@ -218,6 +221,12 @@ public class SerialHandler {
 					} catch (MqttException e) {
 						e.printStackTrace();
 					}
+				}else if (res.length() >= 4 && res.substring(0, 4).equals("VTDS")) {
+					try {
+						serial_client.publish("value/tds", new MqttMessage(res.substring(4, res.length()).getBytes()));
+					} catch (MqttException e) {
+						e.printStackTrace();
+					}
 				} else if (res.length() >= 5 && res.substring(0, 5).equals("VFLOW")) {
 					try {
 						serial_client.publish("value/flow", new MqttMessage(res.substring(5, res.length()).getBytes()));
@@ -232,15 +241,16 @@ public class SerialHandler {
 						e.printStackTrace();
 					}
 				} else if (res.length() >= 3 && res.substring(0, 3).equals("COK")) {
+					std.INFO(this, "COK Input");
 					try {
-						serial_client.publish("serial/camera/reached", new MqttMessage());
+						serial_client.publish("serial/camera/reached", new MqttMessage("OK".getBytes()));
 					} catch (MqttPersistenceException e) {
 						e.printStackTrace();
 					} catch (MqttException e) {
 						e.printStackTrace();
 					}
 				} else if (res.length() >= 4 && res.substring(0, 4).equals("DBUG")) {
-					System.out.println("Arduino-Debug: " + res.substring(4, res.length()));
+					std.INFO(this, "Arduino-Debug: " + res.substring(4, res.length()));
 				}
 			}
 		}

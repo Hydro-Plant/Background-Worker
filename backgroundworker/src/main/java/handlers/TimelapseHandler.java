@@ -22,12 +22,13 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
+import std.std;
 import timelapse.TimeLapseData;
 import timelapse.TimeLapsePos;
 
 public class TimelapseHandler {
-	private final double plant_distance = 1; // in m
-	private final double OtoZ = 1; // in m
+	private final double plant_distance = 0.07; // in m
+	private final double OtoZ = 0.045; // in m
 
 	static MemoryPersistence pers;
 	static MqttClient backg_client;
@@ -37,7 +38,6 @@ public class TimelapseHandler {
 
 	static Gson gson;
 	static File tl_save = new File("saves/timelapse.save");
-	static File tlp_save = new File("saves/timelapse_pos.save");
 
 	static boolean free = true;
 
@@ -51,50 +51,83 @@ public class TimelapseHandler {
 
 			backg_client = new MqttClient("tcp://localhost:1883", "backgroundworker", pers);
 			backg_client.connect();
-			System.out.println("Background-Client communication established");
+			std.INFO(this, "Mqtt-communication established");
 			backg_client.subscribe(new String[] { "timelapse/add", "timelapse/delete", "timelapse/get",
 					"serial/camera/reached", "camera/taken" });
-
-			System.out.println("Background-Client subscriptions completed");
+			std.INFO(this, "Subscriptions added");
 			backg_client.setCallback(new MqttCallback() {
 				@Override
 				public void messageArrived(String topic, MqttMessage message) throws Exception {
 					switch (topic.toUpperCase()) {
 					case "SERIAL/CAMERA/REACHED":
-						System.out.println("Camera reached pos");
-						System.out.println("I want to take a picture");
-						try {
-							backg_client.publish("camera/picture",
-									new MqttMessage(gson.toJson(info).toString().getBytes()));
-						} catch (MqttException e1) {
-							// TODO Auto-generated catch block
-							e1.printStackTrace();
+						boolean still_existing = false;
+						for (int x = 0; x < timelapse_data.size(); x++) {
+							if (info.get(0) == timelapse_data.get(x).id) {
+								still_existing = true;
+								break;
+							}
+						}
+						if (still_existing) {
+							try {
+								backg_client.publish("camera/picture",
+										new MqttMessage(gson.toJson(info).toString().getBytes()));
+							} catch (MqttException e1) {
+								// TODO Auto-generated catch block
+								e1.printStackTrace();
+							}
+						} else {
+							try {
+								backg_client.publish("serial/camera/reset", new MqttMessage());
+							} catch (MqttException e1) {
+								// TODO Auto-generated catch block
+								e1.printStackTrace();
+							}
+							free = true;
 						}
 						break;
 					case "CAMERA/TAKEN":
-						System.out.println("Picture taken");
-						if(video_info != null) {
+						std.INFO(this, "Received camera-picture confirmation");
+						if (video_info != null) {
 							try {
-								backg_client.publish("camera/video", new MqttMessage(gson.toJson(video_info).getBytes()));
+								backg_client.publish("camera/video",
+										new MqttMessage(gson.toJson(video_info).getBytes()));
 							} catch (MqttException e1) {
 								// TODO Auto-generated catch block
 								e1.printStackTrace();
 							}
 							video_info = null;
+
+							for (int x = 0; x < timelapse_data.size(); x++) {
+								if (info.get(0) == timelapse_data.get(x).id) {
+									timelapse_data.remove(x);
+									timelapse_pos.remove(x);
+
+									try {
+										FileWriter fw2 = new FileWriter(tl_save.getAbsolutePath());
+										fw2.write(gson.toJson(timelapse_data));
+										fw2.close();
+										backg_client.publish("timelapse/data",
+												new MqttMessage(gson.toJson(timelapse_data).getBytes()));
+									} catch (MqttException | IOException e) {
+										// TODO Auto-generated catch block
+										e.printStackTrace();
+									}
+									break;
+								}
+							}
 						}
-						
+
 						try {
 							backg_client.publish("serial/camera/reset", new MqttMessage());
 						} catch (MqttException e1) {
 							// TODO Auto-generated catch block
 							e1.printStackTrace();
 						}
-						
+
 						free = true;
 						break;
 					case "TIMELAPSE/ADD":
 						TimeLapseData tld = gson.fromJson(message.toString(), TimeLapseData.class);
-
 						if (LocalDate.parse(tld.date_from).toEpochSecond(LocalTime.parse(tld.time_from),
 								ZoneOffset.of("+1")) != LocalDate.parse(tld.date_to)
 										.toEpochSecond(LocalTime.parse(tld.time_to), ZoneOffset.of("+1"))) {
@@ -120,9 +153,7 @@ public class TimelapseHandler {
 									new MqttMessage(gson.toJson(timelapse_data).getBytes()));
 
 							timelapse_pos.add(tlp);
-							fw = new FileWriter(tlp_save.getAbsolutePath());
-							fw.write(gson.toJson(timelapse_pos));
-							fw.close();
+							std.INFO(this, "Added new timelapse");
 						}
 						break;
 
@@ -132,7 +163,7 @@ public class TimelapseHandler {
 
 						for (int x = 0; x < timelapse_data.size(); x++) {
 							if (timelapse_data.get(x).id == (int) Integer.parseInt(new String(message.getPayload()))) {
-								System.out.println("Data removed");
+								std.INFO(this, "Removed data");
 								timelapse_data.remove(x);
 								break;
 							}
@@ -141,23 +172,18 @@ public class TimelapseHandler {
 						for (int x = 0; x < timelapse_pos.size(); x++) {
 							if (timelapse_pos.get(x).id == (int) Integer.parseInt(new String(message.getPayload()))) {
 								data.add(timelapse_pos.get(x).dates.size());
-								System.out.println("Pos removed");
+								std.INFO(this, "Removed positions");
 								timelapse_pos.remove(x);
 								break;
 							}
 						}
 
-						backg_client.publish("camera/delete", new MqttMessage(gson.toJson(data).getBytes()));
+						if (Integer.parseInt(new String(message.getPayload())) == info.get(0)) {
+							free = true;
+						}
 
-						FileWriter fw2 = new FileWriter(tl_save.getAbsolutePath());
-						fw2.write(gson.toJson(timelapse_data));
-						fw2.close();
 						backg_client.publish("timelapse/data", new MqttMessage(gson.toJson(timelapse_data).getBytes()));
-
-						fw2 = new FileWriter(tlp_save.getAbsolutePath());
-						fw2.write(gson.toJson(timelapse_pos));
-						fw2.close();
-
+						backg_client.publish("camera/delete", new MqttMessage(gson.toJson(data).getBytes()));
 						break;
 
 					case "TIMELAPSE/GET":
@@ -168,8 +194,8 @@ public class TimelapseHandler {
 
 				@Override
 				public void connectionLost(Throwable cause) {
-					System.out.println("Timelapse Mqtt-Connection lost");
-					System.out.println(cause.toString());
+					std.INFO(this, "Mqtt-connection lost");
+					std.INFO(this, cause.toString());
 				}
 
 				@Override
@@ -194,19 +220,7 @@ public class TimelapseHandler {
 				fw.write("[\n]");
 				fw.close();
 			} catch (IOException e) {
-				System.out.println("TimeLapse Save-File couldn't be built");
-				e.printStackTrace();
-			}
-		}
-
-		if (!tlp_save.exists()) {
-			try {
-				tlp_save.createNewFile();
-				FileWriter fw = new FileWriter(tlp_save.getAbsolutePath());
-				fw.write("[\n]");
-				fw.close();
-			} catch (IOException e) {
-				System.out.println("TimeLapsePos Save-File couldn't be built");
+				std.INFO(this, "TimeLapse Save-File couldn't be built");
 				e.printStackTrace();
 			}
 		}
@@ -214,7 +228,7 @@ public class TimelapseHandler {
 		// ----------------------------------- Creating Gson
 
 		gson = new GsonBuilder().setPrettyPrinting().create();
-		System.out.println("TimeLapse-Gson created");
+		std.INFO(this, "Gson created");
 
 		// ----------------------------------- Importing TimeLapses
 
@@ -231,44 +245,26 @@ public class TimelapseHandler {
 			}
 			fr.close();
 		} catch (FileNotFoundException e) {
-			System.out.println("TimeLapse File not found");
+			std.INFO(this, "TimeLapse File not found");
 			e.printStackTrace();
 		} catch (IOException e) {
-			System.out.println("Reading TimeLapse File failed");
+			std.INFO(this, "Reading TimeLapse File failed");
 			e.printStackTrace();
 		}
-		System.out.println("TimeLapseFile read");
+		std.INFO(this, "Save-file read");
 		timelapse_data = new ArrayList<TimeLapseData>();
 		timelapse_data = gson.fromJson(timeLapses.toString(), new TypeToken<ArrayList<TimeLapseData>>() {
 		}.getType());
 
-		System.out.println("Save file data extracted");
-
-		String timeLapsePoses = "";
-		try {
-			FileReader fr = new FileReader(tlp_save.getAbsolutePath());
-			boolean end_reached = false;
-			while (!end_reached) {
-				char x = (char) fr.read();
-				if (x == (char) -1)
-					end_reached = true;
-				else
-					timeLapsePoses += x;
-			}
-			fr.close();
-		} catch (FileNotFoundException e) {
-			System.out.println("TimeLapsePos File not found");
-			e.printStackTrace();
-		} catch (IOException e) {
-			System.out.println("Reading TimeLapsePos File failed");
-			e.printStackTrace();
-		}
-		System.out.println("TimeLapsePosFile read");
 		timelapse_pos = new ArrayList<TimeLapsePos>();
-		timelapse_pos = gson.fromJson(timeLapsePoses.toString(), new TypeToken<ArrayList<TimeLapsePos>>() {
-		}.getType());
 
-		System.out.println("Pos Save file data extracted");
+		for (int x = 0; x < timelapse_data.size(); x++) {
+			timelapse_pos.add(calculateTimeLapseDates(timelapse_data.get(x).getDateFrom(),
+					timelapse_data.get(x).getTimeFrom(), timelapse_data.get(x).getDateTo(),
+					timelapse_data.get(x).getTimeTo(), timelapse_data.get(x).pictures, timelapse_data.get(x).mode));
+			timelapse_pos.get(x).id = timelapse_data.get(x).id;
+		}
+		std.INFO(this, "Save file data extracted");
 	}
 
 	public TimeLapsePos calculateTimeLapseDates(LocalDate from_date, LocalTime from_time, LocalDate to_date,
@@ -277,7 +273,6 @@ public class TimelapseHandler {
 		long epoch_to = to_date.toEpochSecond(to_time, ZoneOffset.of("+1"));
 
 		double image_gap = (double) (epoch_to - epoch_from) / (images - 1);
-		System.out.println(image_gap);
 
 		ArrayList<LocalDate> dates = new ArrayList<LocalDate>();
 		ArrayList<LocalTime> times = new ArrayList<LocalTime>();
@@ -335,7 +330,7 @@ public class TimelapseHandler {
 					sel_epoch = LocalDate.parse(sel.dates.get(sel.at_image))
 							.toEpochSecond(LocalTime.parse(sel.times.get(sel.at_image)), ZoneOffset.of("+1"));
 					if (sel_epoch <= epoch_now) {
-						System.out.println(sel.at_image);
+						std.INFO(this, "Making image " + sel.at_image);
 						free = false;
 						info = new ArrayList<Integer>();
 						info.add(sel.id);
@@ -343,10 +338,9 @@ public class TimelapseHandler {
 
 						ArrayList<Double> pos = new ArrayList<Double>();
 						pos.add(sel.pos.get(sel.at_image));
-						pos.add(sel.angle.get(sel.at_image));
+						pos.add(sel.angle.get(sel.at_image) * 180 / Math.PI);
 
 						try {
-							System.out.println("I want to send the camera somewhere");
 							backg_client.publish("serial/camera/set",
 									new MqttMessage(gson.toJson(pos).toString().getBytes()));
 						} catch (MqttException e1) {
@@ -354,49 +348,21 @@ public class TimelapseHandler {
 							e1.printStackTrace();
 						}
 
-						sel.at_image++;
-						FileWriter fw;
-						try {
-							fw = new FileWriter(tlp_save.getAbsolutePath());
-							fw.write(gson.toJson(timelapse_pos));
-							fw.close();
-						} catch (IOException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-						
 						if (sel.at_image == sel.dates.size() - 1) {
-							System.out.println("Found last image");
-							
+							std.INFO(this, "Last image of video");
+
 							ArrayList<Integer> data = new ArrayList<Integer>();
 							data.add(sel.id);
 							data.add(sel.dates.size());
-							
+
 							video_info = new ArrayList<Double>();
 							video_info.add(info.get(0).doubleValue());
-							video_info.add(info.get(1).doubleValue());
+							video_info.add((double) sel.dates.size());
 							video_info.add(timelapse_data.get(x).frameRate);
-							
-							timelapse_data.remove(x);
-							timelapse_pos.remove(x);
-							
-							try {
-								FileWriter fw2 = new FileWriter(tl_save.getAbsolutePath());
-								fw2.write(gson.toJson(timelapse_data));
-								fw2.close();
-								backg_client.publish("timelapse/data",
-										new MqttMessage(gson.toJson(timelapse_data).getBytes()));
-
-								fw2 = new FileWriter(tlp_save.getAbsolutePath());
-								fw2.write(gson.toJson(timelapse_pos));
-								fw2.close();
-							} catch (MqttException | IOException e) {
-								// TODO Auto-generated catch block
-								e.printStackTrace();
-							}
-							
 						}
-						
+
+						sel.at_image++;
+
 						break;
 					}
 				}

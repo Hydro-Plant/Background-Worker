@@ -6,8 +6,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import org.bytedeco.javacv.FrameGrabber.Exception;
-
 import handlers.CameraHandler;
 import handlers.OptionHandler;
 import handlers.PlantHandler;
@@ -45,9 +43,13 @@ public class App {
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			@Override
 			public void run() {
-				//ch.stop();
+				camera_thread.shutdown();
+				serial_thread.shutdown();
+				timelapse_thread.shutdown();
+				plant_thread.shutdown();
+				option_thread.shutdown();
+				status_thread.shutdown();
 			}
-
 		});
 
 		// ----------------------------------- Checking save directory
@@ -74,6 +76,12 @@ public class App {
 		}
 		oh.setupMqtt();
 		
+		sh = new SerialHandler();
+		sh.setupConnection();
+		sh.setupMqtt();
+		sh.setupGson();
+		sh.requestOptions();
+		
 		sth = new StatusHandler();
 		sth.setupGson();
 		sth.setupMqtt();
@@ -82,21 +90,10 @@ public class App {
 		tlh.setupMqtt();
 		tlh.loadSave();
 
-		sh = new SerialHandler();
-		sh.setupConnection();
-		sh.setupMqtt();
-		sh.setupGson();
-		sh.requestOptions();
-
 		ch = new CameraHandler();
 		ch.setupGson();
 		ch.setupMqtt();
-		try {
-			ch.setupWebcam();
-		} catch (Exception e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
+		ch.setupWebcam();
 
 		ph = new PlantHandler();
 		ph.setupGson();
@@ -140,6 +137,7 @@ public class App {
 			  }
 			}, 0, handle_interval, TimeUnit.MILLISECONDS);
 		
+		
 		/**
 		plant_thread = Executors.newScheduledThreadPool(1);
 		plant_thread.scheduleWithFixedDelay(new Runnable() {
@@ -149,8 +147,6 @@ public class App {
 			}, 0, handle_interval, TimeUnit.MILLISECONDS);
 		**/
 		
-		
-		//System.out.println("HANDLING");
 		while (true) {
 			try {
 				Thread.sleep(1000);
