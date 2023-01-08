@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import javax.imageio.ImageIO;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
+import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttException;
@@ -61,7 +62,7 @@ public class CameraHandler {
 			camera_client = new MqttClient("tcp://localhost:1883", "camera", pers);
 			camera_client.connect();
 			std.INFO(this, "Mqtt-communication established");
-			camera_client.subscribe(new String[] { "camera/picture", "camera/video", "camera/delete" });
+			camera_client.subscribe(new String[] { "camera/picture", "camera/video", "camera/delete" }, new int[] {2, 2, 2});
 			std.INFO(this, "Subscriptions added");
 			camera_client.setCallback(new MqttCallback() {
 				@Override

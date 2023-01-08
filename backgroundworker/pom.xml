@@ -75,8 +75,12 @@
 			<version>1.6.2</version>
 		</dependency>
 
-		<!-- Video making -->
-		
+		<!-- USB Stick -->
+		<dependency>
+			<groupId>net.samuelcampos</groupId>
+			<artifactId>usbdrivedetector</artifactId>
+			<version>2.2.1</version>
+		</dependency>
 	</dependencies>
 
 	<build>

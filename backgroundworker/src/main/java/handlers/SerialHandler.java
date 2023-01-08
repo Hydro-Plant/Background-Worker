@@ -41,7 +41,7 @@ public class SerialHandler {
 			serial_client = new MqttClient("tcp://localhost:1883", "serial", pers);
 			serial_client.connect();
 			std.INFO(this, "Mqtt-communication established");
-			serial_client.subscribe(new String[] { "option/interval", "serial/camera/set", "serial/camera/reset" });
+			serial_client.subscribe(new String[] { "option/interval", "serial/camera/set", "serial/camera/reset" }, new int[] { 2, 2, 2 });
 			std.INFO(this, "Subscriptions added");
 			serial_client.setCallback(new MqttCallback() {
 				@Override

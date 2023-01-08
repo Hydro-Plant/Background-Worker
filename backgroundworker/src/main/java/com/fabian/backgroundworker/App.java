@@ -12,6 +12,7 @@ import handlers.PlantHandler;
 import handlers.SerialHandler;
 import handlers.StatusHandler;
 import handlers.TimelapseHandler;
+import handlers.UsbHandler;
 
 /**
  * Hello world!
@@ -29,13 +30,14 @@ public class App {
 	static PlantHandler ph;
 	static OptionHandler oh;
 	static StatusHandler sth;
+	static UsbHandler uh;
 
 	static ScheduledExecutorService camera_thread;
 	static ScheduledExecutorService serial_thread;
 	static ScheduledExecutorService timelapse_thread;
-	static ScheduledExecutorService plant_thread;
 	static ScheduledExecutorService option_thread;
 	static ScheduledExecutorService status_thread;
+	static ScheduledExecutorService usb_thread;
 
 	public static void main(String[] args) {
 		System.out.println("Backgroundworker active");
@@ -46,9 +48,9 @@ public class App {
 				camera_thread.shutdown();
 				serial_thread.shutdown();
 				timelapse_thread.shutdown();
-				plant_thread.shutdown();
 				option_thread.shutdown();
 				status_thread.shutdown();
+				usb_thread.shutdown();
 			}
 		});
 
@@ -99,6 +101,11 @@ public class App {
 		ph.setupGson();
 		ph.setupMqtt();
 		ph.requestOptions();
+		
+		uh = new UsbHandler();
+		uh.setOptionPath(save_dir.getAbsolutePath());
+		uh.setVideoPath(vid_dir.getAbsolutePath());
+		uh.start();
 
 		// ----------------------------------- Making threads
 
@@ -136,16 +143,6 @@ public class App {
 			    tlh.handle();
 			  }
 			}, 0, handle_interval, TimeUnit.MILLISECONDS);
-		
-		
-		/**
-		plant_thread = Executors.newScheduledThreadPool(1);
-		plant_thread.scheduleWithFixedDelay(new Runnable() {
-			  public void run() {
-			    
-			  }
-			}, 0, handle_interval, TimeUnit.MILLISECONDS);
-		**/
 		
 		while (true) {
 			try {

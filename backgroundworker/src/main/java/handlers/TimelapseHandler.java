@@ -12,8 +12,8 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
-import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
@@ -53,7 +53,7 @@ public class TimelapseHandler {
 			backg_client.connect();
 			std.INFO(this, "Mqtt-communication established");
 			backg_client.subscribe(new String[] { "timelapse/add", "timelapse/delete", "timelapse/get",
-					"serial/camera/reached", "camera/taken" });
+					"serial/camera/reached", "camera/taken" }, new int[]{ 2, 2, 2, 2, 2 });
 			std.INFO(this, "Subscriptions added");
 			backg_client.setCallback(new MqttCallback() {
 				@Override

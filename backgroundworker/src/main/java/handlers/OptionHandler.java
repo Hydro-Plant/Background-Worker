@@ -84,7 +84,7 @@ public class OptionHandler {
 			option_client = new MqttClient("tcp://localhost:1883", "option", pers);
 			option_client.connect();
 			std.INFO(this, "Mqtt-communication established");
-			option_client.subscribe(new String[] { "option/get", "option/set" });
+			option_client.subscribe(new String[] { "option/get", "option/set" }, new int[] {2, 2});
 			std.INFO(this, "Subscriptions added");
 			option_client.setCallback(new MqttCallback() {
 				@Override

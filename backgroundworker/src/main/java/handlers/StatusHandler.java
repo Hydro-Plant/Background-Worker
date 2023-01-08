@@ -37,7 +37,7 @@ public class StatusHandler {
 			status_client = new MqttClient("tcp://localhost:1883", "status", pers);
 			status_client.connect();
 			std.INFO(this, "Mqtt-communication established");
-			status_client.subscribe(new String[] { "status/get", "status/set" });
+			status_client.subscribe(new String[] { "status/get", "status/set" }, new int[] { 2, 2 });
 			std.INFO(this, "Subscriptions added");
 			status_client.setCallback(new MqttCallback() {
 				@Override
