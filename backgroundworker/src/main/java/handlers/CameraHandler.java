@@ -8,9 +8,9 @@ import java.util.ArrayList;
 import javax.imageio.ImageIO;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
-import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
@@ -20,8 +20,9 @@ import com.github.sarxos.webcam.ds.fswebcam.FsWebcamDriver;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+
+import std.std;
 import videocreator.VideoCreator;
-import std.*;
 
 public class CameraHandler {
 	static MemoryPersistence pers;
@@ -34,6 +35,9 @@ public class CameraHandler {
 	ArrayList<MqttMessage> com_order;
 	ArrayList<String> topic_order;
 
+	
+	
+
 	public void setupGson() {
 		gson = new GsonBuilder().setPrettyPrinting().create();
 		std.INFO(this, "Gson created");
@@ -41,7 +45,10 @@ public class CameraHandler {
 
 	public void setupWebcam() {
 		try {
-			Webcam.setDriver(new FsWebcamDriver());
+			String os = System.getProperty("os.name").toLowerCase();
+			if (os.contains("linux")) {
+				Webcam.setDriver(new FsWebcamDriver());
+			}
 			webcam = Webcam.getDefault();
 			webcam.open();
 			std.INFO(this, "Webcam opened");
@@ -52,17 +59,23 @@ public class CameraHandler {
 	}
 
 	public void setupMqtt() {
-		com_order = new ArrayList<MqttMessage>();
-		topic_order = new ArrayList<String>();
+		com_order = new ArrayList<>();
+		topic_order = new ArrayList<>();
 
 		try {
 
 			pers = new MemoryPersistence();
-
+			MqttConnectOptions mqtt_opt = new MqttConnectOptions();
+			mqtt_opt.setMaxInflight(1000);
 			camera_client = new MqttClient("tcp://localhost:1883", "camera", pers);
-			camera_client.connect();
+			camera_client.connect(mqtt_opt);
 			std.INFO(this, "Mqtt-communication established");
-			camera_client.subscribe(new String[] { "camera/picture", "camera/video", "camera/delete" }, new int[] {2, 2, 2});
+			try {
+				camera_client.subscribe(new String[] { "camera/picture", "camera/video", "camera/delete" });
+			} catch (MqttException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			std.INFO(this, "Subscriptions added");
 			camera_client.setCallback(new MqttCallback() {
 				@Override
@@ -82,6 +95,7 @@ public class CameraHandler {
 
 				}
 			});
+
 
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
@@ -133,16 +147,16 @@ public class CameraHandler {
 				int len = (int) Math.floor(val2.get(1));
 				double frameRate = val2.get(2);
 
-				ArrayList<File> imgs = new ArrayList<File>();
+				ArrayList<File> imgs = new ArrayList<>();
 				for (int x = 0; x < len; x++) {
 					File cur_file = new File(new String("images/img_" + id + "_" + x + ".png"));
 					if (cur_file.exists()) {
 						imgs.add(cur_file);
 					}
 				}
-				
+
 				std.INFO(this, "Making new video " + id + " " + len + " " + frameRate);
-				
+
 				if (imgs.size() > 0) {
 					int sizex, sizey;
 					BufferedImage first = null;
@@ -154,17 +168,17 @@ public class CameraHandler {
 					}
 					sizex = first.getWidth();
 					sizey = first.getHeight();
-					
+
 					int num_length = 0;
 					while ((imgs.size() - 1) / Math.pow(10, num_length) >= 1)
 						num_length++;
-					
+
 					String imgs_string = "images/img_buffer_%0" + num_length + "d.png";
 					for(int x = 0; x < imgs.size(); x++) {
 						String new_name = String.format(imgs_string, x);
 						imgs.get(x).renameTo(new File(new_name));
 					}
-					
+
 					String video_name = "";
 					for (int x = 0; true; x++) {
 						if (!new File(new String("videos/" + x + ".mp4")).exists()) {
@@ -180,13 +194,13 @@ public class CameraHandler {
 						e.printStackTrace();
 					}
 					std.INFO(this, "Video saved");
-					
+
 					for (int x = 0; x < imgs.size(); x++) {
 						File cur_file = new File(String.format(imgs_string, x));
 						if (cur_file.exists())
 							cur_file.delete();
 					}
-					
+
 					std.INFO(this, "Images " + id + " deleted");
 				}
 

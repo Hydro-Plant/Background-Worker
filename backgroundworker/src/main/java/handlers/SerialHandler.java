@@ -1,10 +1,15 @@
 package handlers;
 
 import java.util.ArrayList;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
-import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttCallback;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.MqttPersistenceException;
@@ -32,16 +37,24 @@ public class SerialHandler {
 		std.INFO(this, "Gson created");
 	}
 
+	
+
 	public void setupMqtt() {
 		try {
-			port_list = new ArrayList<String>();
+			port_list = new ArrayList<>();
 
 			pers = new MemoryPersistence();
-
+			MqttConnectOptions mqtt_opt = new MqttConnectOptions();
+			mqtt_opt.setMaxInflight(1000);
 			serial_client = new MqttClient("tcp://localhost:1883", "serial", pers);
-			serial_client.connect();
+			serial_client.connect(mqtt_opt);
 			std.INFO(this, "Mqtt-communication established");
-			serial_client.subscribe(new String[] { "option/interval", "serial/camera/set", "serial/camera/reset" }, new int[] { 2, 2, 2 });
+			try {
+				serial_client.subscribe(new String[] { "option/interval", "option/light", "option/flow", "serial/camera/set", "serial/camera/reset" });
+			} catch (MqttException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			std.INFO(this, "Subscriptions added");
 			serial_client.setCallback(new MqttCallback() {
 				@Override
@@ -49,21 +62,35 @@ public class SerialHandler {
 					switch (topic.toUpperCase()) {
 					case "OPTION/INTERVAL":
 						String value = new String(message.getPayload());
-						String msg = "OINTV" + value + "\n";
+						String msg = "!OINTV" + value + "\n";
 						port_list.add(msg);
+						break;
+					case "OPTION/LIGHT":
+						ArrayList<Double> light_options = gson.fromJson(new String(message.getPayload()),
+								new TypeToken<ArrayList<Double>>() {
+								}.getType());
+						String msg3 = "!OLIGT" + ((light_options.get(0) + light_options.get(1)) / 2) + "\n";
+						port_list.add(msg3);
+						break;
+					case "OPTION/FLOW":
+						ArrayList<Double> flow_options = gson.fromJson(new String(message.getPayload()),
+								new TypeToken<ArrayList<Double>>() {
+								}.getType());
+						String msg4 = "!OPUMP" + flow_options.get(0) + "\n";
+						port_list.add(msg4);
 						break;
 					case "SERIAL/CAMERA/SET":
 						ArrayList<Double> cam_pos = gson.fromJson(new String(message.getPayload()),
 								new TypeToken<ArrayList<Double>>() {
 								}.getType());
 						if (cam_pos.size() == 2) {
-							String msg2 = "C" + cam_pos.get(0) + ";" + cam_pos.get(1) + "\n";
+							String msg2 = "!C" + cam_pos.get(0) + ";" + cam_pos.get(1) + "\n";
 							port_list.add(msg2);
 						}
 						break;
 
 					case "SERIAL/CAMERA/RESET":
-						port_list.add("CR\n");
+						port_list.add("!CR\n");
 						break;
 					}
 				}
@@ -79,78 +106,85 @@ public class SerialHandler {
 
 				}
 			});
-
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
 
 	public void setupConnection() {
-		SerialPort[] ports = SerialPort.getCommPorts();
-		SerialPort short_port;
+	    SerialPort[] ports = SerialPort.getCommPorts();
+	    Executor executor = Executors.newSingleThreadExecutor();
 
-		port_loop: for (int x = 0; x < ports.length; x++) {
-			short_port = SerialPort.getCommPorts()[x];
-			short_port.setBaudRate(115200);
-			if (short_port.openPort()) {
-				try {
-					Thread.sleep(1000);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-				std.INFO(this, "Testing port " + short_port.getSystemPortName());
-				
-				for (int y = 0; y < 5; y++) {
-					short_port.writeBytes("?".getBytes(), 2);
-					try {
-						Thread.sleep(500);
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
-					
-					long millis = System.currentTimeMillis();
-					boolean any_answere = false;
-					timer_loop: while (System.currentTimeMillis() < millis + 3000) {
-						if (short_port.bytesAvailable() >= 2) {
-							any_answere = true;
-							byte[] t = new byte[2];
-							short_port.readBytes(t, 2);
-							std.INFO(this, "Answere: " + new String(t));
-							if (new String(t).equals("OK")) {
-								std.INFO(this, "Communication port found");
-								port = short_port;
-								break port_loop;
-							}
-							//try {
-								//Thread.sleep(100);
-							//} catch (InterruptedException e) {
-							//	e.printStackTrace();
-							//}
-							byte[] mt = new byte[1];
-							while (short_port.bytesAvailable() > 0)
-								short_port.readBytes(mt, 1);
-							break timer_loop;
-						}
-					}
-					try {
-						Thread.sleep(100);
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
-					if (!any_answere)
-						break;
-				}
-				std.INFO(this, "Wrong port");
-				short_port.closePort();
-			} else {
-				std.INFO(this, "Could not open port " + short_port.getSystemPortName());
-			}
-		}
+	    port_loop: for (int x = 0; x < ports.length; x++) {
+	        SerialPort short_port = SerialPort.getCommPorts()[x];
+	        short_port.setBaudRate(115200);
+	        if (short_port.openPort()) {
+	            try {
+	                Thread.sleep(1000);
+	            } catch (InterruptedException e) {
+	                e.printStackTrace();
+	            }
+	            std.INFO(this, "Testing port " + short_port.getSystemPortName());
+
+	            for (int y = 0; y < 5; y++) {
+	                Future<Integer> writeTask = ((ExecutorService) executor).submit(() -> short_port.writeBytes("?".getBytes(), 1));
+
+	                try {
+	                    Thread.sleep(500);
+	                } catch (InterruptedException e) {
+	                    e.printStackTrace();
+	                }
+
+	                long millis = System.currentTimeMillis();
+	                boolean any_answere = false;
+	                timer_loop: while (System.currentTimeMillis() < millis + 300) {
+	                    if (short_port.bytesAvailable() >= 2) {
+	                        any_answere = true;
+	                        byte[] t = new byte[2];
+	                        short_port.readBytes(t, 2);
+	                        std.INFO(this, "Answere: " + new String(t));
+	                        if (new String(t).equals("OK")) {
+	                            std.INFO(this, "Communication port found");
+	                            port = short_port;
+	                            break port_loop;
+	                        }
+	                        byte[] mt = new byte[1];
+	                        while (short_port.bytesAvailable() > 0)
+	                            short_port.readBytes(mt, 1);
+	                        break timer_loop;
+	                    }
+	                }
+	                try {
+	                    if (!writeTask.isDone()) {
+	                        writeTask.cancel(true);
+	                    }
+	                } catch (Exception e) {
+	                    e.printStackTrace();
+	                }
+	                try {
+	                    Thread.sleep(100);
+	                } catch (InterruptedException e) {
+	                    e.printStackTrace();
+	                }
+	                if (!any_answere)
+	                    break;
+	            }
+	            std.INFO(this, "Wrong port");
+	            short_port.closePort();
+	        } else {
+	            std.INFO(this, "Could not open port " + short_port.getSystemPortName());
+	        }
+	    }
 	}
-	
+
+
+
+
 	public void requestOptions() {
 		try {
 			serial_client.publish("option/get", new MqttMessage("interval".getBytes()));
+			serial_client.publish("option/get", new MqttMessage("light".getBytes()));
+			serial_client.publish("option/get", new MqttMessage("flow".getBytes()));
 		} catch (MqttException e) {
 			e.printStackTrace();
 		}

@@ -20,7 +20,7 @@ import handlers.UsbHandler;
  */
 public class App {
 	static int handle_interval = 10;
-	
+
 	static File save_dir = new File("saves/");
 	static File img_dir = new File("images/");
 	static File vid_dir = new File("videos/");
@@ -53,7 +53,7 @@ public class App {
 				usb_thread.shutdown();
 			}
 		});
-
+		
 		// ----------------------------------- Checking save directory
 
 		if (!save_dir.exists()) {
@@ -77,13 +77,13 @@ public class App {
 			e.printStackTrace();
 		}
 		oh.setupMqtt();
-		
+
 		sh = new SerialHandler();
 		sh.setupConnection();
 		sh.setupMqtt();
 		sh.setupGson();
 		sh.requestOptions();
-		
+
 		sth = new StatusHandler();
 		sth.setupGson();
 		sth.setupMqtt();
@@ -101,8 +101,10 @@ public class App {
 		ph.setupGson();
 		ph.setupMqtt();
 		ph.requestOptions();
-		
+
 		uh = new UsbHandler();
+		uh.setupGson();
+		uh.setupMqtt();
 		uh.setOptionPath(save_dir.getAbsolutePath());
 		uh.setVideoPath(vid_dir.getAbsolutePath());
 		uh.start();
@@ -111,39 +113,44 @@ public class App {
 
 		option_thread = Executors.newScheduledThreadPool(1);
 		option_thread.scheduleWithFixedDelay(new Runnable() {
-			  public void run() {
+			  @Override
+			public void run() {
 			    oh.handle();
 			  }
 			}, 0, handle_interval, TimeUnit.MILLISECONDS);
-		
+
 		status_thread = Executors.newScheduledThreadPool(1);
 		status_thread.scheduleWithFixedDelay(new Runnable() {
-			  public void run() {
+			  @Override
+			public void run() {
 			    sth.handle();
 			  }
 			}, 0, handle_interval, TimeUnit.MILLISECONDS);
-		
+
 		camera_thread = Executors.newScheduledThreadPool(1);
 		camera_thread.scheduleWithFixedDelay(new Runnable() {
-			  public void run() {
+			  @Override
+			public void run() {
 			    ch.handle();
 			  }
 			}, 0, handle_interval, TimeUnit.MILLISECONDS);
-		
+
 		serial_thread = Executors.newScheduledThreadPool(1);
 		serial_thread.scheduleWithFixedDelay(new Runnable() {
-			  public void run() {
+			  @Override
+			public void run() {
 			    sh.handle();
 			  }
 			}, 0, handle_interval, TimeUnit.MILLISECONDS);
-		
+
 		timelapse_thread = Executors.newScheduledThreadPool(1);
 		timelapse_thread.scheduleWithFixedDelay(new Runnable() {
-			  public void run() {
+			  @Override
+			public void run() {
 			    tlh.handle();
 			  }
 			}, 0, handle_interval, TimeUnit.MILLISECONDS);
-		
+
 		while (true) {
 			try {
 				Thread.sleep(1000);

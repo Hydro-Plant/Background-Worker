@@ -3,8 +3,9 @@ package handlers;
 import java.util.ArrayList;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
-import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttCallback;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
@@ -22,8 +23,11 @@ public class StatusHandler {
 	static Gson gson;
 
 	static boolean save_file = false;
-	static ArrayList<String> requests = new ArrayList<String>();
-	static ArrayList<Status> statuseses = new ArrayList<Status>();
+	static ArrayList<String> requests = new ArrayList<>();
+	static ArrayList<Status> statuseses = new ArrayList<>();
+
+	
+	
 
 	public void setupGson() {
 		gson = new GsonBuilder().setPrettyPrinting().create();
@@ -33,11 +37,17 @@ public class StatusHandler {
 	public void setupMqtt() {
 		try {
 			pers = new MemoryPersistence();
-
+			MqttConnectOptions mqtt_opt = new MqttConnectOptions();
+			mqtt_opt.setMaxInflight(1000);
 			status_client = new MqttClient("tcp://localhost:1883", "status", pers);
-			status_client.connect();
+			status_client.connect(mqtt_opt);
 			std.INFO(this, "Mqtt-communication established");
-			status_client.subscribe(new String[] { "status/get", "status/set" }, new int[] { 2, 2 });
+			try {
+				status_client.subscribe(new String[] { "status/get", "status/set" }, new int[] { 2, 2 });
+			} catch (MqttException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			std.INFO(this, "Subscriptions added");
 			status_client.setCallback(new MqttCallback() {
 				@Override
@@ -87,9 +97,9 @@ public class StatusHandler {
 	public void handle() {
 		if (requests.size() > 0) {
 			Status requested = null;
-			for (int x = 0; x < statuseses.size(); x++) {
-				if (statuseses.get(x).equals(requests.get(0))) {
-					requested = statuseses.get(x);
+			for (Status element : statuseses) {
+				if (element.equals(requests.get(0))) {
+					requested = element;
 				}
 			}
 			if (requested != null) {

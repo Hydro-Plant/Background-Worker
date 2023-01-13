@@ -1,15 +1,18 @@
 package handlers;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
-import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttCallback;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
@@ -30,8 +33,11 @@ public class OptionHandler {
 	static Gson gson;
 
 	static boolean save_file = false;
-	static ArrayList<String> requests = new ArrayList<String>();
+	static ArrayList<String> requests = new ArrayList<>();
 	static ArrayList<Option> options;
+
+	
+	
 
 	public void setupGson() {
 		gson = new GsonBuilder().setPrettyPrinting().create();
@@ -71,25 +77,45 @@ public class OptionHandler {
 			e.printStackTrace();
 		}
 		std.INFO(this, "Options-File read");
-		options = new ArrayList<Option>();
+		options = new ArrayList<>();
 		options = gson.fromJson(option_string, new TypeToken<ArrayList<Option>>() {
 		}.getType());
+		
+		for(int x = 0; x < options.size(); x++) {
+			if(options.get(x).getName().equals("wifi")) {
+				ArrayList<String> wifi_data = gson.fromJson(options.get(x).getString(), new TypeToken<ArrayList<String>>(){}.getType());
+				connectToWLAN(wifi_data.get(0), wifi_data.get(1));
+				break;
+			}
+		}
 	}
-	
+
 
 	public void setupMqtt() {
 		try {
 			pers = new MemoryPersistence();
-
+			MqttConnectOptions mqtt_opt = new MqttConnectOptions();
+			mqtt_opt.setMaxInflight(1000);
 			option_client = new MqttClient("tcp://localhost:1883", "option", pers);
-			option_client.connect();
+			option_client.connect(mqtt_opt);
 			std.INFO(this, "Mqtt-communication established");
-			option_client.subscribe(new String[] { "option/get", "option/set" }, new int[] {2, 2});
+			try {
+				option_client.subscribe(new String[] { "option/get", "option/set", "option/reload" });
+			} catch (MqttException e) {
+				e.printStackTrace();
+			}
 			std.INFO(this, "Subscriptions added");
 			option_client.setCallback(new MqttCallback() {
 				@Override
 				public void messageArrived(String topic, MqttMessage message) throws Exception {
 					switch (topic.toUpperCase()) {
+					case "OPTION/RELOAD":
+						std.INFO(this, "Reloading options");
+						setupSave();
+						for(int x = 0; x < options.size(); x++) {
+							requests.add(options.get(x).getName());
+						}
+						break;
 					case "OPTION/GET":
 						requests.add(new String(message.getPayload()));
 						break;
@@ -114,7 +140,7 @@ public class OptionHandler {
 					}
 				}
 
-				
+
 				@Override
 				public void connectionLost(Throwable cause) {
 					std.INFO(this, "Mqtt-connection lost");
@@ -127,17 +153,44 @@ public class OptionHandler {
 				}
 			});
 
+
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
+	
+	private void connectToWLAN(String ssid, String password) {
+		std.INFO(this, "Connecting to WIFI");
+        String os = System.getProperty("os.name").toLowerCase();
+        String command;
+
+        if (os.contains("linux")) {
+            command = "nmcli device wifi connect " + ssid + " password " + password;
+        } else {
+            std.INFO(this, "Unsupported operating system");
+            return;
+        }
+
+        try {
+        	ProcessBuilder pb = new ProcessBuilder("bash", "-c", command);
+            Process p = pb.start();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                std.INFO(this, line);
+            }
+            p.waitFor();
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
 
 	public void handle() {
 		if (requests.size() > 0) {
 			Option requested = null;
-			for(int x = 0; x < options.size(); x++) {
-				if(options.get(x).equals(requests.get(0))) {
-					requested = options.get(x);
+			for (Option option : options) {
+				if(option.equals(requests.get(0))) {
+					requested = option;
 				}
 			}
 			if(requested != null) {

@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
@@ -48,12 +49,18 @@ public class TimelapseHandler {
 		try {
 
 			pers = new MemoryPersistence();
-
+			MqttConnectOptions mqtt_opt = new MqttConnectOptions();
+			mqtt_opt.setMaxInflight(1000);
 			backg_client = new MqttClient("tcp://localhost:1883", "backgroundworker", pers);
-			backg_client.connect();
+			backg_client.connect(mqtt_opt);
 			std.INFO(this, "Mqtt-communication established");
-			backg_client.subscribe(new String[] { "timelapse/add", "timelapse/delete", "timelapse/get",
-					"serial/camera/reached", "camera/taken" }, new int[]{ 2, 2, 2, 2, 2 });
+			try {
+				backg_client.subscribe(new String[] { "timelapse/add", "timelapse/delete", "timelapse/get",
+						"serial/camera/reached", "camera/taken" }, new int[]{ 2, 2, 2, 2, 2 });
+			} catch (MqttException e2) {
+				// TODO Auto-generated catch block
+				e2.printStackTrace();
+			}
 			std.INFO(this, "Subscriptions added");
 			backg_client.setCallback(new MqttCallback() {
 				@Override
@@ -61,8 +68,8 @@ public class TimelapseHandler {
 					switch (topic.toUpperCase()) {
 					case "SERIAL/CAMERA/REACHED":
 						boolean still_existing = false;
-						for (int x = 0; x < timelapse_data.size(); x++) {
-							if (info.get(0) == timelapse_data.get(x).id) {
+						for (TimeLapseData element : timelapse_data) {
+							if (info.get(0) == element.id) {
 								still_existing = true;
 								break;
 							}
@@ -136,8 +143,8 @@ public class TimelapseHandler {
 									tld.getDateTo(), tld.getTimeTo(), tld.pictures, tld.mode);
 
 							idloop: for (int x = 0; true; x++) {
-								for (int y = 0; y < timelapse_data.size(); y++) {
-									if (x == timelapse_data.get(y).id)
+								for (TimeLapseData element : timelapse_data) {
+									if (x == element.id)
 										continue idloop;
 								}
 								tld.id = x;
@@ -158,11 +165,11 @@ public class TimelapseHandler {
 						break;
 
 					case "TIMELAPSE/DELETE":
-						ArrayList<Integer> data = new ArrayList<Integer>();
+						ArrayList<Integer> data = new ArrayList<>();
 						data.add(Integer.parseInt(new String(message.getPayload())));
 
 						for (int x = 0; x < timelapse_data.size(); x++) {
-							if (timelapse_data.get(x).id == (int) Integer.parseInt(new String(message.getPayload()))) {
+							if (timelapse_data.get(x).id == Integer.parseInt(new String(message.getPayload()))) {
 								std.INFO(this, "Removed data");
 								timelapse_data.remove(x);
 								break;
@@ -170,7 +177,7 @@ public class TimelapseHandler {
 						}
 
 						for (int x = 0; x < timelapse_pos.size(); x++) {
-							if (timelapse_pos.get(x).id == (int) Integer.parseInt(new String(message.getPayload()))) {
+							if (timelapse_pos.get(x).id == Integer.parseInt(new String(message.getPayload()))) {
 								data.add(timelapse_pos.get(x).dates.size());
 								std.INFO(this, "Removed positions");
 								timelapse_pos.remove(x);
@@ -252,11 +259,11 @@ public class TimelapseHandler {
 			e.printStackTrace();
 		}
 		std.INFO(this, "Save-file read");
-		timelapse_data = new ArrayList<TimeLapseData>();
+		timelapse_data = new ArrayList<>();
 		timelapse_data = gson.fromJson(timeLapses.toString(), new TypeToken<ArrayList<TimeLapseData>>() {
 		}.getType());
 
-		timelapse_pos = new ArrayList<TimeLapsePos>();
+		timelapse_pos = new ArrayList<>();
 
 		for (int x = 0; x < timelapse_data.size(); x++) {
 			timelapse_pos.add(calculateTimeLapseDates(timelapse_data.get(x).getDateFrom(),
@@ -274,11 +281,11 @@ public class TimelapseHandler {
 
 		double image_gap = (double) (epoch_to - epoch_from) / (images - 1);
 
-		ArrayList<LocalDate> dates = new ArrayList<LocalDate>();
-		ArrayList<LocalTime> times = new ArrayList<LocalTime>();
+		ArrayList<LocalDate> dates = new ArrayList<>();
+		ArrayList<LocalTime> times = new ArrayList<>();
 
-		ArrayList<Double> pos = new ArrayList<Double>();
-		ArrayList<Double> angle = new ArrayList<Double>();
+		ArrayList<Double> pos = new ArrayList<>();
+		ArrayList<Double> angle = new ArrayList<>();
 		for (int x = 0; x < images; x++) {
 			LocalDateTime ldt = LocalDateTime.ofEpochSecond((long) (epoch_from + x * image_gap), 0,
 					ZoneOffset.of("+1"));
@@ -314,7 +321,7 @@ public class TimelapseHandler {
 				if (sel.at_image <= sel.dates.size() - 1) {
 					boolean done = false;
 					long sel_epoch;
-					while (!done) {
+					while (!done && sel.at_image != sel.dates.size() - 1) {
 						if (sel.at_image + 1 < sel.dates.size()) {
 							sel_epoch = LocalDate.parse(sel.dates.get(sel.at_image + 1)).toEpochSecond(
 									LocalTime.parse(sel.times.get(sel.at_image + 1)), ZoneOffset.of("+1"));
@@ -332,11 +339,11 @@ public class TimelapseHandler {
 					if (sel_epoch <= epoch_now) {
 						std.INFO(this, "Making image " + sel.at_image);
 						free = false;
-						info = new ArrayList<Integer>();
+						info = new ArrayList<>();
 						info.add(sel.id);
 						info.add(sel.at_image);
 
-						ArrayList<Double> pos = new ArrayList<Double>();
+						ArrayList<Double> pos = new ArrayList<>();
 						pos.add(sel.pos.get(sel.at_image));
 						pos.add(sel.angle.get(sel.at_image) * 180 / Math.PI);
 
@@ -351,11 +358,11 @@ public class TimelapseHandler {
 						if (sel.at_image == sel.dates.size() - 1) {
 							std.INFO(this, "Last image of video");
 
-							ArrayList<Integer> data = new ArrayList<Integer>();
+							ArrayList<Integer> data = new ArrayList<>();
 							data.add(sel.id);
 							data.add(sel.dates.size());
 
-							video_info = new ArrayList<Double>();
+							video_info = new ArrayList<>();
 							video_info.add(info.get(0).doubleValue());
 							video_info.add((double) sel.dates.size());
 							video_info.add(timelapse_data.get(x).frameRate);

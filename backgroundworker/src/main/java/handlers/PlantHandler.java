@@ -3,8 +3,9 @@ package handlers;
 import java.util.ArrayList;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
-import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttCallback;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
@@ -41,19 +42,26 @@ public class PlantHandler {
 	public void setupMqtt() {
 		try {
 			pers = new MemoryPersistence();
+			MqttConnectOptions mqtt_opt = new MqttConnectOptions();
+			mqtt_opt.setMaxInflight(1000);
 			plant_client = new MqttClient("tcp://localhost:1883", "plant", pers);
-			plant_client.connect();
+			plant_client.connect(mqtt_opt);
 			std.INFO(this, "Mqtt-communication established");
-			plant_client.subscribe(new String[] { "option/temperature", "option/light", "option/ph", "option/ec",
-					"option/tds", "option/level", "option/flow", "option/ec_or_tds", "value/temperature", "value/light",
-					"value/ph", "value/ec", "value/tds", "value/flow", "value/level" }, new int[] { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 });
+			try {
+				plant_client.subscribe(new String[] { "option/temperature", "option/light", "option/ph", "option/ec",
+						"option/tds", "option/level", "option/flow", "option/ec_or_tds", "value/temperature", "value/light",
+						"value/ph", "value/ec", "value/tds", "value/flow", "value/level" });
+			} catch (MqttException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			std.INFO(this, "Subscriptions added");
 			plant_client.setCallback(new MqttCallback() {
 				@Override
 				public void messageArrived(String topic, MqttMessage message) throws Exception {
 					switch (topic.toUpperCase()) {
 					case "OPTION/TEMPERATURE":
-						ArrayList<Double> temp_options = gson.fromJson(new String(message.getPayload()),
+						ArrayList<Double> temp_options = gson.fromJson(message.toString(),
 								new TypeToken<ArrayList<Double>>() {
 								}.getType());
 						temp_min = temp_options.get(0);
@@ -178,6 +186,7 @@ public class PlantHandler {
 			plant_client.publish("option/get", new MqttMessage("level".getBytes()));
 			plant_client.publish("option/get", new MqttMessage("flow".getBytes()));
 			plant_client.publish("option/get", new MqttMessage("ec_or_tds".getBytes()));
+			plant_client.publish("option/get", new MqttMessage("wifi".getBytes()));
 		} catch (MqttException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -269,9 +278,9 @@ public class PlantHandler {
 				e.printStackTrace();
 			}
 		}
-		
+
 		// ------------------------------------------------------------------------------------------------------------------------------------ Checking pH
-		
+
 		if ((ph_value > ph_max || ph_value < ph_min) && level_value >= min_measuring) {
 			try {
 				plant_client.publish("warning/ph", new MqttMessage("true".getBytes()));
@@ -355,9 +364,9 @@ public class PlantHandler {
 				e.printStackTrace();
 			}
 		}
-		
+
 		// ------------------------------------------------------------------------------------------------------------------------------------ Checking EC or TDS
-		
+
 		if ((tds_value > tds_max || tds_value < tds_min) && level_value >= min_measuring) {
 			try {
 				plant_client.publish("warning/" + ec_or_tds, new MqttMessage("true".getBytes()));
@@ -406,9 +415,9 @@ public class PlantHandler {
 				double m2 = level_value;
 
 				double m1 = m2 * (TDS - tds2);
-				
+
 				result += "Füge " + m1 + "mg Salz hinzu, um den optimalen " + ec_or_tds.toUpperCase() + "-Wert zu erreichen.";
-				
+
 			}
 
 			try {

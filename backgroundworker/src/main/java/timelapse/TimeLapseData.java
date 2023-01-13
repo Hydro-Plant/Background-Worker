@@ -51,19 +51,19 @@ public class TimeLapseData {
 
 		this.id = -1;
 	}
-	
+
 	public LocalDate getDateFrom() {
 		return LocalDate.parse(date_from);
 	}
-	
+
 	public LocalDate getDateTo() {
 		return LocalDate.parse(date_to);
 	}
-	
+
 	public LocalTime getTimeFrom() {
 		return LocalTime.parse(time_from);
 	}
-	
+
 	public LocalTime getTimeTo() {
 		return LocalTime.parse(time_to);
 	}
