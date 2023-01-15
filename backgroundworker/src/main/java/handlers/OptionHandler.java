@@ -95,7 +95,7 @@ public class OptionHandler {
 		try {
 			pers = new MemoryPersistence();
 			MqttConnectOptions mqtt_opt = new MqttConnectOptions();
-			mqtt_opt.setMaxInflight(1000);
+			mqtt_opt.setMaxInflight(100);
 			option_client = new MqttClient("tcp://localhost:1883", "option", pers);
 			option_client.connect(mqtt_opt);
 			std.INFO(this, "Mqtt-communication established");
@@ -143,8 +143,8 @@ public class OptionHandler {
 
 				@Override
 				public void connectionLost(Throwable cause) {
-					std.INFO(this, "Mqtt-connection lost");
-					std.INFO(this, cause.toString());
+					std.INFO("OptionHandler", "Mqtt-connection lost");
+					std.INFO("OptionHandler", cause.toString());
 				}
 
 				@Override

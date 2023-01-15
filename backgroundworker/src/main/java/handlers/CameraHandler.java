@@ -1,5 +1,6 @@
 package handlers;
 
+import java.awt.Dimension;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -16,6 +17,7 @@ import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
 import com.github.sarxos.webcam.Webcam;
+import com.github.sarxos.webcam.WebcamResolution;
 import com.github.sarxos.webcam.ds.fswebcam.FsWebcamDriver;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -50,6 +52,8 @@ public class CameraHandler {
 				Webcam.setDriver(new FsWebcamDriver());
 			}
 			webcam = Webcam.getDefault();
+			webcam.setCustomViewSizes(new Dimension[] { WebcamResolution.FHD.getSize() }); // register custom size
+			webcam.setViewSize(WebcamResolution.FHD.getSize()); // set custom size
 			webcam.open();
 			std.INFO(this, "Webcam opened");
 		} catch (Exception e) {
@@ -66,7 +70,7 @@ public class CameraHandler {
 
 			pers = new MemoryPersistence();
 			MqttConnectOptions mqtt_opt = new MqttConnectOptions();
-			mqtt_opt.setMaxInflight(1000);
+			mqtt_opt.setMaxInflight(100);
 			camera_client = new MqttClient("tcp://localhost:1883", "camera", pers);
 			camera_client.connect(mqtt_opt);
 			std.INFO(this, "Mqtt-communication established");
@@ -86,8 +90,8 @@ public class CameraHandler {
 
 				@Override
 				public void connectionLost(Throwable cause) {
-					std.INFO(this, "Mqtt-connection lost");
-					std.INFO(this, cause.toString());
+					std.INFO("CameraHandler", "Mqtt-connection lost");
+					std.INFO("CameraHandler", cause.toString());
 				}
 
 				@Override

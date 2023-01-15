@@ -6,6 +6,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.eclipse.paho.client.mqttv3.MqttException;
+
 import handlers.CameraHandler;
 import handlers.OptionHandler;
 import handlers.PlantHandler;
@@ -139,7 +141,11 @@ public class App {
 		serial_thread.scheduleWithFixedDelay(new Runnable() {
 			  @Override
 			public void run() {
-			    sh.handle();
+			    try {
+					sh.handle();
+				} catch (MqttException e) {
+					e.printStackTrace();
+				}
 			  }
 			}, 0, handle_interval, TimeUnit.MILLISECONDS);
 

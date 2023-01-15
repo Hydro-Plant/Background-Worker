@@ -50,7 +50,7 @@ public class UsbHandler {
 		try {
 			pers = new MemoryPersistence();
 			MqttConnectOptions mqtt_opt = new MqttConnectOptions();
-			mqtt_opt.setMaxInflight(1000);
+			mqtt_opt.setMaxInflight(100);
 			usb_client = new MqttClient("tcp://localhost:1883", "usb", pers);
 			usb_client.connect(mqtt_opt);
 			std.INFO(this, "Mqtt-communication established");

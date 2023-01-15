@@ -21,6 +21,8 @@ public class PlantHandler {
 	static MqttClient plant_client;
 
 	double temp_value, light_value, ph_value, ec_value, tds_value, flow_value, level_value;
+	
+	boolean pump_status;
 
 	double temp_min, temp_opt, temp_tol, temp_max;
 	double light_min, light_max;
@@ -43,13 +45,13 @@ public class PlantHandler {
 		try {
 			pers = new MemoryPersistence();
 			MqttConnectOptions mqtt_opt = new MqttConnectOptions();
-			mqtt_opt.setMaxInflight(1000);
+			mqtt_opt.setMaxInflight(100);
 			plant_client = new MqttClient("tcp://localhost:1883", "plant", pers);
 			plant_client.connect(mqtt_opt);
 			std.INFO(this, "Mqtt-communication established");
 			try {
 				plant_client.subscribe(new String[] { "option/temperature", "option/light", "option/ph", "option/ec",
-						"option/tds", "option/level", "option/flow", "option/ec_or_tds", "value/temperature", "value/light",
+						"option/tds", "option/level", "option/flow", "option/ec_or_tds", "status/pump", "value/temperature", "value/light",
 						"value/ph", "value/ec", "value/tds", "value/flow", "value/level" });
 			} catch (MqttException e) {
 				// TODO Auto-generated catch block
@@ -70,14 +72,14 @@ public class PlantHandler {
 						temp_max = temp_options.get(3);
 						break;
 					case "OPTION/LIGHT":
-						ArrayList<Double> light_options = gson.fromJson(new String(message.getPayload()),
+						ArrayList<Double> light_options = gson.fromJson(message.toString(),
 								new TypeToken<ArrayList<Double>>() {
 								}.getType());
 						light_min = light_options.get(0);
 						light_max = light_options.get(1);
 						break;
 					case "OPTION/PH":
-						ArrayList<Double> ph_options = gson.fromJson(new String(message.getPayload()),
+						ArrayList<Double> ph_options = gson.fromJson(message.toString(),
 								new TypeToken<ArrayList<Double>>() {
 								}.getType());
 						ph_min = ph_options.get(0);
@@ -86,7 +88,7 @@ public class PlantHandler {
 						ph_max = ph_options.get(3);
 						break;
 					case "OPTION/EC":
-						ArrayList<Double> ec_options = gson.fromJson(new String(message.getPayload()),
+						ArrayList<Double> ec_options = gson.fromJson(message.toString(),
 								new TypeToken<ArrayList<Double>>() {
 								}.getType());
 						ec_min = ec_options.get(0);
@@ -100,7 +102,7 @@ public class PlantHandler {
 						tds_max = ec_options.get(3) * 500;
 						break;
 					case "OPTION/TDS":
-						ArrayList<Double> tds_options = gson.fromJson(new String(message.getPayload()),
+						ArrayList<Double> tds_options = gson.fromJson(message.toString(),
 								new TypeToken<ArrayList<Double>>() {
 								}.getType());
 						tds_min = tds_options.get(0);
@@ -114,14 +116,14 @@ public class PlantHandler {
 						ec_max = tds_options.get(3) / 500;
 						break;
 					case "OPTION/LEVEL":
-						ArrayList<Double> level_options = gson.fromJson(new String(message.getPayload()),
+						ArrayList<Double> level_options = gson.fromJson(message.toString(),
 								new TypeToken<ArrayList<Double>>() {
 								}.getType());
 						max_level = level_options.get(0);
 						min_measuring = level_options.get(1);
 						break;
 					case "OPTION/FLOW":
-						ArrayList<Double> flow_options = gson.fromJson(new String(message.getPayload()),
+						ArrayList<Double> flow_options = gson.fromJson(message.toString(),
 								new TypeToken<ArrayList<Double>>() {
 								}.getType());
 						normal_flow = flow_options.get(0);
@@ -130,29 +132,33 @@ public class PlantHandler {
 					case "OPTION/EC_OR_TDS":
 						ec_or_tds = message.toString();
 						break;
-
+						
+					case "STATUS/PUMP":
+						pump_status = Boolean.parseBoolean(message.toString());
+						break;
+						
 					case "VALUE/TEMPERATURE":
-						temp_value = Double.parseDouble(new String(message.getPayload()));
+						temp_value = Double.parseDouble(message.toString());
 						break;
 					case "VALUE/LIGHT":
-						light_value = Double.parseDouble(new String(message.getPayload()));
+						light_value = Double.parseDouble(message.toString());
 						break;
 					case "VALUE/PH":
-						ph_value = Double.parseDouble(new String(message.getPayload()));
+						ph_value = Double.parseDouble(message.toString());
 						break;
 					case "VALUE/EC":
-						ec_value = Double.parseDouble(new String(message.getPayload()));
+						ec_value = Double.parseDouble(message.toString());
 						tds_value = ec_value * 500;
 						break;
 					case "VALUE/TDS":
-						tds_value = Double.parseDouble(new String(message.getPayload()));
+						tds_value = Double.parseDouble(message.toString());
 						ec_value = tds_value / 500;
 						break;
 					case "VALUE/LEVEL":
-						level_value = Double.parseDouble(new String(message.getPayload()));
+						level_value = Double.parseDouble(message.toString());
 						break;
 					case "VALUE/FLOW":
-						flow_value = Double.parseDouble(new String(message.getPayload()));
+						flow_value = Double.parseDouble(message.toString());
 						break;
 					}
 					update();
@@ -160,8 +166,8 @@ public class PlantHandler {
 
 				@Override
 				public void connectionLost(Throwable cause) {
-					std.INFO(this, "Mqtt-connection lost");
-					std.INFO(this, cause.toString());
+					std.INFO("PlantHandler", "Mqtt-connection lost");
+					std.INFO("PlantHandler", cause.toString());
 				}
 
 				@Override
@@ -434,5 +440,9 @@ public class PlantHandler {
 				e.printStackTrace();
 			}
 		}
+		
+		// ------------------------------------------------------------------------------------------------------------------------------------ Checking Flow
+		
+		// if()
 	}
 }

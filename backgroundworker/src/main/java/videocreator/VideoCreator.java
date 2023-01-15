@@ -6,14 +6,12 @@ import java.io.InputStreamReader;
 public class VideoCreator {
     public static void createVideo(String imageFiles, double fps, int height, int width, String outputPath) throws Exception {
         // Create the FFmpeg command
-        String command;        
+        String[] command;
         if (System.getProperty("os.name").startsWith("Windows")) {
-        	command = "C:\\ffmpeg\\bin\\ffmpeg.exe -i .\\" + imageFiles + " -r " + fps + " -s " + width + "x" + height + " -vcodec libx264 -crf 25 -pix_fmt yuv420p .\\" + outputPath;
-        	command = command.replace('/', '\\');
+            command = new String[] { "C:\\ffmpeg\\bin\\ffmpeg.exe", "-i", ".\\" + imageFiles, "-r", String.valueOf(fps), "-s", width + "x" + height, "-vcodec", "libx264", "-crf", "25", "-pix_fmt", "yuv420p", ".\\" + outputPath };
         } else {
-        	command = "ffmpeg -i " + imageFiles + " -r " + fps + " -s " + width + "x" + height + " -vcodec libx264 -crf 25 -pix_fmt yuv420p " + outputPath;
+            command = new String[] { "ffmpeg", "-i", imageFiles, "-r", String.valueOf(fps), "-s", width + "x" + height, "-vcodec", "libx264", "-crf", "25", "-pix_fmt", "yuv420p", outputPath };
         }
-        
         // Execute the command
         ProcessBuilder builder = new ProcessBuilder(command);
         Process process = builder.start();

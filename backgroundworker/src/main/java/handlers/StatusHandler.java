@@ -38,7 +38,7 @@ public class StatusHandler {
 		try {
 			pers = new MemoryPersistence();
 			MqttConnectOptions mqtt_opt = new MqttConnectOptions();
-			mqtt_opt.setMaxInflight(1000);
+			mqtt_opt.setMaxInflight(100);
 			status_client = new MqttClient("tcp://localhost:1883", "status", pers);
 			status_client.connect(mqtt_opt);
 			std.INFO(this, "Mqtt-communication established");
@@ -79,8 +79,8 @@ public class StatusHandler {
 
 				@Override
 				public void connectionLost(Throwable cause) {
-					std.INFO(this, "Mqtt-connection lost");
-					std.INFO(this, cause.toString());
+					std.INFO("StatusHandler", "Mqtt-connection lost");
+					std.INFO("StatusHandler", cause.toString());
 				}
 
 				@Override
