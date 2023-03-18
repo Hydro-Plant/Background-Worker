@@ -8,6 +8,7 @@ import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.eclipse.paho.client.mqttv3.MqttPersistenceException;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
 import com.google.gson.Gson;
@@ -21,7 +22,7 @@ public class PlantHandler {
 	static MqttClient plant_client;
 
 	double temp_value, light_value, ph_value, ec_value, tds_value, flow_value, level_value;
-	
+
 	boolean pump_status;
 
 	double temp_min, temp_opt, temp_tol, temp_max;
@@ -45,18 +46,14 @@ public class PlantHandler {
 		try {
 			pers = new MemoryPersistence();
 			MqttConnectOptions mqtt_opt = new MqttConnectOptions();
-			mqtt_opt.setMaxInflight(100);
+			mqtt_opt.setMaxInflight(50);
 			plant_client = new MqttClient("tcp://localhost:1883", "plant", pers);
 			plant_client.connect(mqtt_opt);
+			
 			std.INFO(this, "Mqtt-communication established");
-			try {
-				plant_client.subscribe(new String[] { "option/temperature", "option/light", "option/ph", "option/ec",
-						"option/tds", "option/level", "option/flow", "option/ec_or_tds", "status/pump", "value/temperature", "value/light",
-						"value/ph", "value/ec", "value/tds", "value/flow", "value/level" });
-			} catch (MqttException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			plant_client.subscribe(new String[] { "option/temperature", "option/light", "option/ph", "option/ec", "option/tds",
+								"option/level", "option/flow", "option/ec_or_tds", "value/pump", "value/temperature",
+								"value/light", "value/ph", "value/ec", "value/tds", "value/flow", "value/level" });
 			std.INFO(this, "Subscriptions added");
 			plant_client.setCallback(new MqttCallback() {
 				@Override
@@ -132,11 +129,11 @@ public class PlantHandler {
 					case "OPTION/EC_OR_TDS":
 						ec_or_tds = message.toString();
 						break;
-						
-					case "STATUS/PUMP":
+
+					case "VALUE/PUMP":
 						pump_status = Boolean.parseBoolean(message.toString());
 						break;
-						
+
 					case "VALUE/TEMPERATURE":
 						temp_value = Double.parseDouble(message.toString());
 						break;
@@ -161,7 +158,11 @@ public class PlantHandler {
 						flow_value = Double.parseDouble(message.toString());
 						break;
 					}
-					update();
+					try {
+						update();
+					} catch(Exception e) {
+						
+					}
 				}
 
 				@Override
@@ -182,32 +183,11 @@ public class PlantHandler {
 		}
 	}
 
-	public void requestOptions() {
-		try {
-			plant_client.publish("option/get", new MqttMessage("temperature".getBytes()));
-			plant_client.publish("option/get", new MqttMessage("light".getBytes()));
-			plant_client.publish("option/get", new MqttMessage("ph".getBytes()));
-			plant_client.publish("option/get", new MqttMessage("ec".getBytes()));
-			plant_client.publish("option/get", new MqttMessage("tds".getBytes()));
-			plant_client.publish("option/get", new MqttMessage("level".getBytes()));
-			plant_client.publish("option/get", new MqttMessage("flow".getBytes()));
-			plant_client.publish("option/get", new MqttMessage("ec_or_tds".getBytes()));
-			plant_client.publish("option/get", new MqttMessage("wifi".getBytes()));
-		} catch (MqttException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	}
-
-	private void update() {
-		// ------------------------------------------------------------------------------------------------------------------------------------ Checking temperature
+	private void update() throws MqttPersistenceException, MqttException {
+		// ------------------------------------------------------------------------------------------------------------------------------------
+		// Checking temperature
 		if ((temp_value > temp_max || temp_value < temp_min) && level_value >= min_measuring) {
-			try {
-				plant_client.publish("warning/temperature", new MqttMessage("true".getBytes()));
-			} catch (MqttException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			plant_client.publish("warning/temperature", new MqttMessage("true".getBytes()));
 			String result = "";
 
 			if (temp_value > temp_max) {
@@ -269,31 +249,16 @@ public class PlantHandler {
 							m1);
 				}
 			}
-
-			try {
-				plant_client.publish("warningtext/temperature", new MqttMessage(result.getBytes()));
-			} catch (MqttException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			plant_client.publish("warningtext/temperature", new MqttMessage(result.getBytes()));
 		} else {
-			try {
-				plant_client.publish("warning/temperature", new MqttMessage("false".getBytes()));
-			} catch (MqttException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			plant_client.publish("warning/temperature", new MqttMessage("false".getBytes()));
 		}
 
-		// ------------------------------------------------------------------------------------------------------------------------------------ Checking pH
+		// ------------------------------------------------------------------------------------------------------------------------------------
+		// Checking pH
 
 		if ((ph_value > ph_max || ph_value < ph_min) && level_value >= min_measuring) {
-			try {
-				plant_client.publish("warning/ph", new MqttMessage("true".getBytes()));
-			} catch (MqttException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			plant_client.publish("warning/ph", new MqttMessage("true".getBytes()));
 			String result = "";
 
 			if (ph_value > ph_max) {
@@ -322,8 +287,7 @@ public class PlantHandler {
 					}
 				} else {
 					result += String.format(
-							"Bitte füge %.2fl der pH-Down Lösung hinzu, um den optimale pH-Wert zu erreichen. ",
-							m1);
+							"Bitte füge %.2fl der pH-Down Lösung hinzu, um den optimale pH-Wert zu erreichen. ", m1);
 				}
 			} else {
 				result += "Der pH-Wert des Wassers ist zu niedrig. ";
@@ -351,35 +315,20 @@ public class PlantHandler {
 					}
 				} else {
 					result += String.format(
-							"Bitte füge %.2fl der pH-Up Lösung hinzu, um den optimale pH-Wert zu erreichen. ",
-							m1);
+							"Bitte füge %.2fl der pH-Up Lösung hinzu, um den optimale pH-Wert zu erreichen. ", m1);
 				}
 			}
 
-			try {
-				plant_client.publish("warningtext/ph", new MqttMessage(result.getBytes()));
-			} catch (MqttException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			plant_client.publish("warningtext/ph", new MqttMessage(result.getBytes()));
 		} else {
-			try {
-				plant_client.publish("warning/ph", new MqttMessage("false".getBytes()));
-			} catch (MqttException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			plant_client.publish("warning/ph", new MqttMessage("false".getBytes()));
 		}
 
-		// ------------------------------------------------------------------------------------------------------------------------------------ Checking EC or TDS
+		// ------------------------------------------------------------------------------------------------------------------------------------
+		// Checking EC or TDS
 
 		if ((tds_value > tds_max || tds_value < tds_min) && level_value >= min_measuring) {
-			try {
-				plant_client.publish("warning/" + ec_or_tds, new MqttMessage("true".getBytes()));
-			} catch (MqttException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			plant_client.publish("warning/" + ec_or_tds, new MqttMessage("true".getBytes()));
 			String result = "";
 
 			if (tds_value > tds_max) {
@@ -407,9 +356,8 @@ public class PlantHandler {
 								(max_level - level_value));
 					}
 				} else {
-					result += String.format(
-							"Bitte füge %.2fl an destilliertem Wasser hinzu, um den optimale " + ec_or_tds.toUpperCase() + "-Wert zu erreichen. ",
-							m1);
+					result += String.format("Bitte füge %.2fl an destilliertem Wasser hinzu, um den optimale "
+							+ ec_or_tds.toUpperCase() + "-Wert zu erreichen. ", m1);
 				}
 			} else {
 				result += "Der " + ec_or_tds.toUpperCase() + "-Wert des Wassers ist zu niedrig. ";
@@ -422,27 +370,62 @@ public class PlantHandler {
 
 				double m1 = m2 * (TDS - tds2);
 
-				result += "Füge " + m1 + "mg Salz hinzu, um den optimalen " + ec_or_tds.toUpperCase() + "-Wert zu erreichen.";
+				result += "Füge " + String.format("%.2f", m1) + "mg Salz hinzu, um den optimalen " + ec_or_tds.toUpperCase()
+						+ "-Wert zu erreichen.";
 
 			}
 
-			try {
-				plant_client.publish("warningtext/" + ec_or_tds, new MqttMessage(result.getBytes()));
-			} catch (MqttException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			plant_client.publish("warningtext/" + ec_or_tds, new MqttMessage(result.getBytes()));
 		} else {
-			try {
-				plant_client.publish("warning/" + ec_or_tds, new MqttMessage("false".getBytes()));
-			} catch (MqttException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+			plant_client.publish("warning/" + ec_or_tds, new MqttMessage("false".getBytes()));
+		}
+
+		// ------------------------------------------------------------------------------------------------------------------------------------
+		// Checking Flow
+
+		if ((!this.pump_status && this.flow_value > this.flow_tol)
+				|| (this.pump_status && (this.flow_value > this.normal_flow + this.flow_tol
+						|| this.flow_value < this.normal_flow - this.flow_tol))) {
+			String result = "";
+			if (!this.pump_status && this.flow_value > this.flow_tol) {
+				result = "Die Pumpe ist aus, jedoch ist der Durchfluss nicht 0. ";
+			} else if (this.pump_status && this.flow_value > this.normal_flow + this.flow_tol) {
+				result = "Die Pumpe ist an, jedoch ist der Durchfluss zu hoch. ";
+			} else {
+				result = "Die Pumpe ist an, jedoch ist der Durchfluss zu niedrig. ";
 			}
+			result += "Bitte überprüf die Pumpe und den Durchflussensor. ";
+
+			plant_client.publish("warning/flow", new MqttMessage("true".getBytes()));
+			plant_client.publish("warningtext/flow", new MqttMessage(result.getBytes()));
+		} else {
+			plant_client.publish("warning/flow", new MqttMessage("false".getBytes()));
+		}
+
+		// ------------------------------------------------------------------------------------------------------------------------------------
+		// Checking Light
+		
+		if(this.light_value > this.light_max || this.light_value < this.light_min) {
+			String result = "";
+			if (this.light_value > this.light_max) {
+				result = "Die Beleuchtungszeit ist zu hoch. Bitte überprüf die Lampen, den Helligkeitssensor oder stell das Gerät in einen weniger beleuchteten Platz. ";
+			} else {
+				result = "Die Beleuchtungszeit ist zu niedrig. Bitte überprüf die Lampen und den Helligkeitssensor. ";
+			}
+			
+			plant_client.publish("warning/light", new MqttMessage("true".getBytes()));
+			plant_client.publish("warningtext/light", new MqttMessage(result.getBytes()));
+		} else {
+			plant_client.publish("warning/light", new MqttMessage("false".getBytes()));
 		}
 		
-		// ------------------------------------------------------------------------------------------------------------------------------------ Checking Flow
-		
-		// if()
+		if(this.level_value < this.min_measuring) {
+			String result = "Bitte füll " + (this.max_level * 0.9 - this.level_value) + "l in den Tank, um ihn bis zu 90% zu füllen. Dadurch bleibt Spielraum um mögliche benötigte Korrekturen zu ermöglichen.";
+			
+			plant_client.publish("warning/level", new MqttMessage("true".getBytes()));
+			plant_client.publish("warningtext/level", new MqttMessage(result.getBytes()));
+		} else {
+			plant_client.publish("warning/level", new MqttMessage("false".getBytes()));
+		}
 	}
 }

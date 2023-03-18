@@ -14,6 +14,7 @@ import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.eclipse.paho.client.mqttv3.MqttPersistenceException;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
 import com.github.sarxos.webcam.Webcam;
@@ -36,9 +37,6 @@ public class CameraHandler {
 
 	ArrayList<MqttMessage> com_order;
 	ArrayList<String> topic_order;
-
-	
-	
 
 	public void setupGson() {
 		gson = new GsonBuilder().setPrettyPrinting().create();
@@ -70,7 +68,7 @@ public class CameraHandler {
 
 			pers = new MemoryPersistence();
 			MqttConnectOptions mqtt_opt = new MqttConnectOptions();
-			mqtt_opt.setMaxInflight(100);
+			mqtt_opt.setMaxInflight(50);
 			camera_client = new MqttClient("tcp://localhost:1883", "camera", pers);
 			camera_client.connect(mqtt_opt);
 			std.INFO(this, "Mqtt-communication established");
@@ -111,7 +109,7 @@ public class CameraHandler {
 		webcam.close();
 	}
 
-	public void handle() {
+	public void handle() throws MqttPersistenceException, MqttException {
 		if (com_order.size() > 0 && topic_order.size() > 0) {
 			switch (topic_order.get(0).toUpperCase()) {
 			case "CAMERA/PICTURE":
@@ -119,12 +117,6 @@ public class CameraHandler {
 						new TypeToken<ArrayList<Integer>>() {
 						}.getType());
 				BufferedImage img = webcam.getImage();
-				try {
-					camera_client.publish("camera/taken", new MqttMessage());
-				} catch (MqttException e3) {
-					// TODO Auto-generated catch block
-					e3.printStackTrace();
-				}
 				std.INFO(this, "Picture " + val.get(0) + " " + val.get(1) + " made");
 
 				try {
@@ -135,6 +127,7 @@ public class CameraHandler {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
+				camera_client.publish("camera/taken", new MqttMessage("OK".getBytes()));
 
 				break;
 			case "CAMERA/VIDEO":

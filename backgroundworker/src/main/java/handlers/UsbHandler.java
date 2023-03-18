@@ -50,7 +50,7 @@ public class UsbHandler {
 		try {
 			pers = new MemoryPersistence();
 			MqttConnectOptions mqtt_opt = new MqttConnectOptions();
-			mqtt_opt.setMaxInflight(100);
+			mqtt_opt.setMaxInflight(50);
 			usb_client = new MqttClient("tcp://localhost:1883", "usb", pers);
 			usb_client.connect(mqtt_opt);
 			std.INFO(this, "Mqtt-communication established");
@@ -115,7 +115,7 @@ public class UsbHandler {
 						ProcessBuilder pb = new ProcessBuilder(command);
 						pb.inheritIO().start().waitFor();
 						
-						usb_client.publish("option/reload", new MqttMessage());
+						usb_client.publish("option/reload", new MqttMessage("OK".getBytes()));
 
 					} catch (Exception e) {
 						System.err.println("Error copying file: " + e.getMessage());

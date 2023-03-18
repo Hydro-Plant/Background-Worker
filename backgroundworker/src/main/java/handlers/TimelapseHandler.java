@@ -47,16 +47,15 @@ public class TimelapseHandler {
 
 	public void setupMqtt() {
 		try {
-
 			pers = new MemoryPersistence();
 			MqttConnectOptions mqtt_opt = new MqttConnectOptions();
-			mqtt_opt.setMaxInflight(100);
+			mqtt_opt.setMaxInflight(50);
 			backg_client = new MqttClient("tcp://localhost:1883", "backgroundworker", pers);
 			backg_client.connect(mqtt_opt);
 			std.INFO(this, "Mqtt-communication established");
 			try {
 				backg_client.subscribe(new String[] { "timelapse/add", "timelapse/delete", "timelapse/get",
-						"serial/camera/reached", "camera/taken" }, new int[]{ 2, 2, 2, 2, 2 });
+						"serial/camera/reached", "camera/taken" }, new int[] { 2, 2, 2, 2, 2 });
 			} catch (MqttException e2) {
 				// TODO Auto-generated catch block
 				e2.printStackTrace();
@@ -75,25 +74,18 @@ public class TimelapseHandler {
 							}
 						}
 						if (still_existing) {
-							try {
-								backg_client.publish("camera/picture",
-										new MqttMessage(gson.toJson(info).toString().getBytes()));
-							} catch (MqttException e1) {
-								// TODO Auto-generated catch block
-								e1.printStackTrace();
-							}
+							backg_client.publish("camera/picture",
+									new MqttMessage(gson.toJson(info).toString().getBytes()));
 						} else {
-							try {
-								backg_client.publish("serial/camera/reset", new MqttMessage());
-							} catch (MqttException e1) {
-								// TODO Auto-generated catch block
-								e1.printStackTrace();
-							}
+							backg_client.publish("serial/camera/reset", new MqttMessage("OK".getBytes()));
+
 							free = true;
 						}
 						break;
 					case "CAMERA/TAKEN":
-						std.INFO(this, "Received camera-picture confirmation");
+						System.out.println("JAAA");
+						backg_client.publish("serial/camera/reset", new MqttMessage("OK".getBytes()));
+
 						if (video_info != null) {
 							try {
 								backg_client.publish("camera/video",
@@ -124,12 +116,7 @@ public class TimelapseHandler {
 							}
 						}
 
-						try {
-							backg_client.publish("serial/camera/reset", new MqttMessage());
-						} catch (MqttException e1) {
-							// TODO Auto-generated catch block
-							e1.printStackTrace();
-						}
+						// std.INFO("TimelapseHandler", "Received camera-picture confirmation");
 
 						free = true;
 						break;
@@ -156,11 +143,10 @@ public class TimelapseHandler {
 							FileWriter fw = new FileWriter(tl_save.getAbsolutePath());
 							fw.write(gson.toJson(timelapse_data));
 							fw.close();
-							backg_client.publish("timelapse/data",
-									new MqttMessage(gson.toJson(timelapse_data).getBytes()));
-
 							timelapse_pos.add(tlp);
 							std.INFO(this, "Added new timelapse");
+							backg_client.publish("timelapse/data",
+									new MqttMessage(gson.toJson(timelapse_data).getBytes()));
 						}
 						break;
 
@@ -194,7 +180,7 @@ public class TimelapseHandler {
 						break;
 
 					case "TIMELAPSE/GET":
-						backg_client.publish("timelapse/data", new MqttMessage(gson.toJson(timelapse_data).getBytes()));
+						if(timelapse_data != null) backg_client.publish("timelapse/data", new MqttMessage(gson.toJson(timelapse_data).getBytes()));
 						break;
 					}
 				}
@@ -272,6 +258,13 @@ public class TimelapseHandler {
 			timelapse_pos.get(x).id = timelapse_data.get(x).id;
 		}
 		std.INFO(this, "Save file data extracted");
+		if(timelapse_data != null)
+			try {
+				backg_client.publish("timelapse/data", new MqttMessage(gson.toJson(timelapse_data).getBytes()));
+			} catch (MqttException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 	}
 
 	public TimeLapsePos calculateTimeLapseDates(LocalDate from_date, LocalTime from_time, LocalDate to_date,

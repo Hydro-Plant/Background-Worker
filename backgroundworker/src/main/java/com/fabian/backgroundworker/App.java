@@ -12,7 +12,6 @@ import handlers.CameraHandler;
 import handlers.OptionHandler;
 import handlers.PlantHandler;
 import handlers.SerialHandler;
-import handlers.StatusHandler;
 import handlers.TimelapseHandler;
 import handlers.UsbHandler;
 
@@ -31,14 +30,12 @@ public class App {
 	static CameraHandler ch;
 	static PlantHandler ph;
 	static OptionHandler oh;
-	static StatusHandler sth;
 	static UsbHandler uh;
 
 	static ScheduledExecutorService camera_thread;
 	static ScheduledExecutorService serial_thread;
 	static ScheduledExecutorService timelapse_thread;
 	static ScheduledExecutorService option_thread;
-	static ScheduledExecutorService status_thread;
 	static ScheduledExecutorService usb_thread;
 
 	public static void main(String[] args) {
@@ -51,7 +48,6 @@ public class App {
 				serial_thread.shutdown();
 				timelapse_thread.shutdown();
 				option_thread.shutdown();
-				status_thread.shutdown();
 				usb_thread.shutdown();
 			}
 		});
@@ -70,25 +66,10 @@ public class App {
 
 		// ----------------------------------- Adding Handlers
 
-		oh = new OptionHandler();
-		oh.setupGson();
-		try {
-			oh.setupSave();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		oh.setupMqtt();
-
 		sh = new SerialHandler();
 		sh.setupConnection();
-		sh.setupMqtt();
 		sh.setupGson();
-		sh.requestOptions();
-
-		sth = new StatusHandler();
-		sth.setupGson();
-		sth.setupMqtt();
+		sh.setupMqtt();
 
 		tlh = new TimelapseHandler();
 		tlh.setupMqtt();
@@ -102,7 +83,6 @@ public class App {
 		ph = new PlantHandler();
 		ph.setupGson();
 		ph.setupMqtt();
-		ph.requestOptions();
 
 		uh = new UsbHandler();
 		uh.setupGson();
@@ -110,6 +90,16 @@ public class App {
 		uh.setOptionPath(save_dir.getAbsolutePath());
 		uh.setVideoPath(vid_dir.getAbsolutePath());
 		uh.start();
+		
+		oh = new OptionHandler();
+		oh.setupGson();
+		try {
+			oh.setupSave();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		oh.setupMqtt();
 
 		// ----------------------------------- Making threads
 
@@ -121,19 +111,16 @@ public class App {
 			  }
 			}, 0, handle_interval, TimeUnit.MILLISECONDS);
 
-		status_thread = Executors.newScheduledThreadPool(1);
-		status_thread.scheduleWithFixedDelay(new Runnable() {
-			  @Override
-			public void run() {
-			    sth.handle();
-			  }
-			}, 0, handle_interval, TimeUnit.MILLISECONDS);
-
 		camera_thread = Executors.newScheduledThreadPool(1);
 		camera_thread.scheduleWithFixedDelay(new Runnable() {
 			  @Override
 			public void run() {
-			    ch.handle();
+			    try {
+					ch.handle();
+				} catch (MqttException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 			  }
 			}, 0, handle_interval, TimeUnit.MILLISECONDS);
 

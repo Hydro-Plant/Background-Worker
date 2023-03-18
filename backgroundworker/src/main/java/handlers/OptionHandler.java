@@ -36,9 +36,6 @@ public class OptionHandler {
 	static ArrayList<String> requests = new ArrayList<>();
 	static ArrayList<Option> options;
 
-	
-	
-
 	public void setupGson() {
 		gson = new GsonBuilder().setPrettyPrinting().create();
 		std.INFO(this, "Gson created");
@@ -86,6 +83,8 @@ public class OptionHandler {
 				ArrayList<String> wifi_data = gson.fromJson(options.get(x).getString(), new TypeToken<ArrayList<String>>(){}.getType());
 				connectToWLAN(wifi_data.get(0), wifi_data.get(1));
 				break;
+			} else {
+				requests.add(options.get(x).getName());
 			}
 		}
 	}
@@ -95,15 +94,12 @@ public class OptionHandler {
 		try {
 			pers = new MemoryPersistence();
 			MqttConnectOptions mqtt_opt = new MqttConnectOptions();
-			mqtt_opt.setMaxInflight(100);
+			mqtt_opt.setMaxInflight(50);
 			option_client = new MqttClient("tcp://localhost:1883", "option", pers);
 			option_client.connect(mqtt_opt);
 			std.INFO(this, "Mqtt-communication established");
-			try {
-				option_client.subscribe(new String[] { "option/get", "option/set", "option/reload" });
-			} catch (MqttException e) {
-				e.printStackTrace();
-			}
+			option_client.subscribe(new String[] { "option/get", "option/set", "option/reload" });
+
 			std.INFO(this, "Subscriptions added");
 			option_client.setCallback(new MqttCallback() {
 				@Override
@@ -165,7 +161,7 @@ public class OptionHandler {
         String command;
 
         if (os.contains("linux")) {
-            command = "nmcli device wifi connect " + ssid + " password " + password;
+            command = "nmcli d wifi connect " + ssid + " password " + password;
         } else {
             std.INFO(this, "Unsupported operating system");
             return;
@@ -195,7 +191,10 @@ public class OptionHandler {
 			}
 			if(requested != null) {
 				try {
-					option_client.publish("option/" + requested.getName(), new MqttMessage(requested.getString().getBytes()));
+					MqttMessage msg = new MqttMessage(requested.getString().getBytes());
+					msg.setRetained(true);
+					msg.setQos(2);
+					option_client.publish("option/" + requested.getName(), msg);
 				} catch (MqttException e) {
 					e.printStackTrace();
 				}
