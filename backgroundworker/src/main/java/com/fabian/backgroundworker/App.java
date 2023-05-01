@@ -15,10 +15,6 @@ import handlers.SerialHandler;
 import handlers.TimelapseHandler;
 import handlers.UsbHandler;
 
-/**
- * Hello world!
- *
- */
 public class App {
 	static int handle_interval = 10;
 

@@ -1,3 +1,9 @@
+/*
+ *
+ * 		Made by OpenAI's ChatGPT
+ *
+ */
+
 package videocreator;
 
 import java.io.BufferedReader;

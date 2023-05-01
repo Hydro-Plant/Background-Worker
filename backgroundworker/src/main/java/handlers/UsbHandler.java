@@ -1,6 +1,6 @@
 /*
  *
- * 		Made by OpenAI's ChatGPT
+ * 		Made with OpenAI's ChatGPT
  *
  */
 
